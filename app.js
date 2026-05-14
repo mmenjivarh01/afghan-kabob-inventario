@@ -666,13 +666,13 @@
       h+="<td><div class=\"stock-cell\">";
       h+="<div class=\"bar-bg\"><div class=\"bar-fill\" style=\"width:"+pct+"%;background:"+barClr(st)+"\"></div></div>";
       h+="<span class=\"stock-num "+st+"-color\">"+escapeHTML(p.cantidad)+"</span>";
-            h+="</div></td>";
+      h+="<button class=\"btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">&#9881; "+(lang==="es"?"Ajustar":"Adjust")+"</button>";
+      h+="</div></td>";
       h+="<td class=\"mono-cell\">"+escapeHTML(p.minimo)+"</td>";
       h+="<td class=\"mono-cell diff-cell "+diffClass+"\">"+diffSign+diff+"</td>";
       h+="<td class=\"mono-cell small-cell\">"+escapeHTML(p.unidad)+"</td>";
       h+="<td>"+statusEl(st)+"</td>";
       h+="<td>";
-      h+="<button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">&#9881;</button>";
       h+="<button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
       h+="<button class=\"action-btn del\" data-id=\""+p.id+"\" data-action=\"del\" aria-label=\"Eliminar\">&#10005;</button></td>";
       h+="</tr>";
