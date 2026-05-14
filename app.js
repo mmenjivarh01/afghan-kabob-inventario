@@ -279,7 +279,24 @@
   }
 
   /* ===== FIREBASE DATABASE REFERENCE ===== */
-  var db = firebase.database();
+  if (!window.firebase || !window.firebase.database) {
+    console.error("[Inventario] Firebase no cargo correctamente. Verifica tu conexion a internet.");
+    document.getElementById("loadingText").textContent =
+      "Error: no se pudo conectar con Firebase. Verifica tu conexion.";
+    document.getElementById("loadingText").style.color = "#c0392b";
+    return; /* Stop execution of the IIFE */
+  }
+
+  var db;
+  try {
+    db = firebase.database();
+  } catch(e) {
+    console.error("[Inventario] Error al inicializar Firebase:", e);
+    document.getElementById("loadingText").textContent =
+      "Error al inicializar la base de datos. Recarga la pagina.";
+    document.getElementById("loadingText").style.color = "#c0392b";
+    return;
+  }
 
   function dbRef(inv, key) {
     return db.ref("inventario/" + inv + "/" + key);
@@ -295,25 +312,52 @@
     };
   }
 
-  /* Save to Firebase */
+  /* Save to Firebase — use objects keyed by ID, not arrays */
   function saveState(inv) {
-    /* Firebase deletes nodes when arrays are empty.
-       We store a special marker so we can distinguish
-       "intentionally empty" from "never initialized". */
-    var prods = state[inv].productos.length > 0
-      ? state[inv].productos
-      : ["__empty__"];
-    dbRef(inv, "productos").set(prods);
-    dbRef(inv, "categorias").set(state[inv].categorias);
-    dbRef(inv, "unidades").set(state[inv].unidades);
+    if (!db) { console.error("[Inventario] Firebase no disponible"); return; }
+
+    /* Convert productos array to object: { "id_1": {...}, "id_2": {...} } */
+    var prodsObj = {};
+    if (state[inv].productos.length === 0) {
+      prodsObj["__empty__"] = true; /* marker so node is not deleted by Firebase */
+    } else {
+      state[inv].productos.forEach(function(p) {
+        prodsObj["id_" + p.id] = p;
+      });
+    }
+
+    /* Convert categorias array to object: { "0": "Carnes", "1": "Verduras" } */
+    var catsObj = {};
+    state[inv].categorias.forEach(function(c, i) { catsObj["c" + i] = c; });
+
+    /* Convert unidades array to object: { "0": "kg", "1": "L" } */
+    var unitsObj = {};
+    state[inv].unidades.forEach(function(u, i) { unitsObj["u" + i] = u; });
+
+    dbRef(inv, "productos").set(prodsObj).catch(function(e) {
+      console.error("[Inventario] Error guardando productos:", e);
+      toast("Error al guardar. Verifica tu conexion.");
+    });
+    dbRef(inv, "categorias").set(catsObj).catch(function(e) {
+      console.error("[Inventario] Error guardando categorias:", e);
+    });
+    dbRef(inv, "unidades").set(unitsObj).catch(function(e) {
+      console.error("[Inventario] Error guardando unidades:", e);
+    });
   }
 
   /* Save cat/unit translations to Firebase */
   function saveCatTransFB(inv, map) {
-    db.ref("inventario/" + inv + "/cattrans").set(map);
+    if (!db) { return; }
+    db.ref("inventario/" + inv + "/cattrans").set(map).catch(function(e) {
+      console.error("[Inventario] Error guardando traducciones de categorias:", e);
+    });
   }
   function saveUnitTransFB(inv, map) {
-    db.ref("inventario/" + inv + "/unittrans").set(map);
+    if (!db) { return; }
+    db.ref("inventario/" + inv + "/unittrans").set(map).catch(function(e) {
+      console.error("[Inventario] Error guardando traducciones de unidades:", e);
+    });
   }
 
   /* Listen for real-time changes from other users */
@@ -338,13 +382,20 @@
     ["a","b"].forEach(function(inv) {
       db.ref("inventario/" + inv).on("value", function(snapshot) {
         var data = snapshot.val();
+
         if (!data) {
-          /* Firebase returned null — node never existed, push defaults */
+          /* Node never existed — initialize with defaults */
           var def = DEFAULTS(inv);
+          var prodsObj = {};
+          def.productos.forEach(function(p) { prodsObj["id_" + p.id] = Object.assign({}, p); });
+          var catsObj  = {};
+          def.categorias.forEach(function(c, i) { catsObj["c" + i] = c; });
+          var unitsObj = {};
+          def.unidades.forEach(function(u, i)   { unitsObj["u" + i] = u; });
           db.ref("inventario/" + inv).set({
-            productos:  def.productos.map(function(x){return Object.assign({},x);}),
-            categorias: def.categorias.slice(),
-            unidades:   def.unidades.slice(),
+            productos:  prodsObj,
+            categorias: catsObj,
+            unidades:   unitsObj,
             cattrans:   {},
             unittrans:  {}
           });
@@ -353,42 +404,64 @@
           return;
         }
 
-        /* Handle productos: filter out the empty marker */
+        /* Convert productos object back to sorted array */
         if (data.productos) {
-          var prods = Array.isArray(data.productos)
-            ? data.productos.filter(function(p) { return p !== "__empty__" && p !== null; })
-            : [];
-          state[inv].productos = prods;
+          if (data.productos["__empty__"]) {
+            state[inv].productos = [];
+          } else {
+            var prodsArr = [];
+            Object.keys(data.productos).forEach(function(k) {
+              var p = data.productos[k];
+              if (p && typeof p === "object" && p.id) { prodsArr.push(p); }
+            });
+            prodsArr.sort(function(a, b) { return a.id - b.id; });
+            state[inv].productos = prodsArr;
+          }
         } else {
-          /* productos key missing but node exists — user deleted all products */
           state[inv].productos = [];
         }
-        /* Handle categorias: filter nulls */
-        if (data.categorias) {
-          state[inv].categorias = Array.isArray(data.categorias)
-            ? data.categorias.filter(function(c) { return c !== null && c !== undefined && c !== ""; })
-            : state[inv].categorias;
+
+        /* Convert categorias object back to array */
+        if (data.categorias && typeof data.categorias === "object") {
+          var catsArr = [];
+          Object.keys(data.categorias).sort().forEach(function(k) {
+            var c = data.categorias[k];
+            if (c && typeof c === "string") { catsArr.push(c); }
+          });
+          if (catsArr.length) { state[inv].categorias = catsArr; }
         }
-        /* Handle unidades: filter nulls */
-        if (data.unidades) {
-          state[inv].unidades = Array.isArray(data.unidades)
-            ? data.unidades.filter(function(u) { return u !== null && u !== undefined && u !== ""; })
-            : state[inv].unidades;
+
+        /* Convert unidades object back to array */
+        if (data.unidades && typeof data.unidades === "object") {
+          var unitsArr = [];
+          Object.keys(data.unidades).sort().forEach(function(k) {
+            var u = data.unidades[k];
+            if (u && typeof u === "string") { unitsArr.push(u); }
+          });
+          if (unitsArr.length) { state[inv].unidades = unitsArr; }
         }
-        if (data.cattrans)   { catTransCache[inv]    = data.cattrans; }
-        if (data.unittrans)  { unitTransCache[inv]   = data.unittrans; }
+
+        if (data.cattrans)  { catTransCache[inv]  = data.cattrans; }
+        if (data.unittrans) { unitTransCache[inv] = data.unittrans; }
 
         if (!loaded[inv]) {
-          /* First load complete for this inventory */
           loaded[inv] = true;
           checkAllLoaded();
         } else {
-          /* Subsequent real-time update */
           if (inv === activeInv) {
             if (filterCat !== "todos" && cs().indexOf(filterCat) < 0) { filterCat = "todos"; }
             render();
           }
         }
+      }, function(error) {
+        console.error("[Inventario] Error de conexion Firebase:", error);
+        var lt = document.getElementById("loadingText");
+        if (lt) {
+          lt.textContent = "Error de conexion. Verifica tu internet y recarga.";
+          lt.style.color = "#c0392b";
+        }
+        var ov = document.getElementById("loadingOverlay");
+        if (ov) { ov.style.display = "flex"; ov.classList.remove("hidden"); }
       });
     });
   }
@@ -418,6 +491,16 @@
     var i = cs().indexOf(cat);
     var p = PAL[(i>=0?i:0) % PAL.length];
     return "background:" + p.bg + ";color:" + p.color;
+  }
+
+  /* ===== XSS PROTECTION ===== */
+  function escapeHTML(str) {
+    return String(str === null || str === undefined ? "" : str)
+      .replace(/&/g,  "&amp;")
+      .replace(/</g,  "&lt;")
+      .replace(/>/g,  "&gt;")
+      .replace(/"/g,  "&quot;")
+      .replace(/'/g,  "&#039;");
   }
 
   var now = new Date();
@@ -555,7 +638,7 @@
              p.nombre.toLowerCase().indexOf(q)>=0;
     });
     if (sortField) {
-      list.sort(function(a,b) {
+      list = list.slice().sort(function(a,b) {
         var av=a[sortField], bv=b[sortField];
         if (typeof av==="string"){av=av.toLowerCase();bv=bv.toLowerCase();}
         return sortAsc?(av>bv?1:-1):(av<bv?1:-1);
@@ -577,18 +660,18 @@
       var diff      = p.cantidad - p.minimo;
       var diffSign  = diff > 0 ? "+" : "";
       var diffClass = diff > 0 ? "ok-color" : diff === 0 ? "" : "danger-color";
-      h+="<tr draggable=\"true\" data-id=\""+p.id+"\" class=\"draggable-row\">";
+      h+="<tr class=\"draggable-row\">";
       h+="<td class=\"drag-handle\" title=\""+(lang==="es"?"Arrastrar para reordenar":"Drag to reorder")+"\">&#8597;</td>";
-      h+="<td><strong>"+p.nombre+"</strong></td>";
-      h+="<td><span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+p.categoria+"</span></td>";
+      h+="<td><strong>"+escapeHTML(p.nombre)+"</strong></td>";
+      h+="<td><span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(p.categoria)+"</span></td>";
       h+="<td><div class=\"stock-cell\">";
       h+="<div class=\"bar-bg\"><div class=\"bar-fill\" style=\"width:"+pct+"%;background:"+barClr(st)+"\"></div></div>";
-      h+="<span class=\"stock-num "+st+"-color\">"+p.cantidad+"</span>";
+      h+="<span class=\"stock-num "+st+"-color\">"+escapeHTML(p.cantidad)+"</span>";
       h+="<button class=\"btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">+/- "+adj+"</button>";
       h+="</div></td>";
-      h+="<td class=\"mono-cell\">"+p.minimo+"</td>";
+      h+="<td class=\"mono-cell\">"+escapeHTML(p.minimo)+"</td>";
       h+="<td class=\"mono-cell diff-cell "+diffClass+"\">"+diffSign+diff+"</td>";
-      h+="<td class=\"mono-cell small-cell\">"+p.unidad+"</td>";
+      h+="<td class=\"mono-cell small-cell\">"+escapeHTML(p.unidad)+"</td>";
       h+="<td>"+statusEl(st)+"</td>";
       h+="<td><button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
       h+="<button class=\"action-btn del\" data-id=\""+p.id+"\" data-action=\"del\" aria-label=\"Eliminar\">&#10005;</button></td>";
@@ -611,11 +694,11 @@
       var diff = p.cantidad - p.minimo;
       var diffSign  = diff > 0 ? "+" : "";
       var diffClass = diff > 0 ? "ok-color" : diff === 0 ? "" : "danger-color";
-      h+="<div class=\"inv-card\" draggable=\"true\" data-id=\""+p.id+"\">";
+      h+="<div class=\"inv-card\">";
       h+="<div class=\"card-header\">";
       h+="<div>";
-      h+="<div class=\"card-name\">"+p.nombre+"</div>";
-      h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+";margin-top:0.3rem\">"+p.categoria+"</span>";
+      h+="<div class=\"card-name\">"+escapeHTML(p.nombre)+"</div>";
+      h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+";margin-top:0.3rem\">"+escapeHTML(p.categoria)+"</span>";
       h+="</div>";
       h+="<div style=\"display:flex;align-items:center;gap:0.5rem;\">";
       h+=statusEl(st);
@@ -639,86 +722,48 @@
   function sortBy(f) { sortAsc=(sortField===f)?!sortAsc:true; sortField=f; render(); }
   window.sortBy=sortBy;
 
-  /* ===== DRAG AND DROP — TABLE ===== */
-  var dragSrcId = null;
+  /* ===== SORTABLEJS — drag & drop (iOS Safari compatible) ===== */
+  var sortableTable = null;
+  var sortableCards = null;
 
-  function initDragDrop() {
-    var rows = document.querySelectorAll(".draggable-row");
-    rows.forEach(function(row) {
-      row.addEventListener("dragstart", function(e) {
-        dragSrcId = parseInt(row.dataset.id, 10);
-        row.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-      });
-      row.addEventListener("dragend", function() {
-        row.classList.remove("dragging");
-        document.querySelectorAll(".draggable-row").forEach(function(r) {
-          r.classList.remove("drag-over");
-        });
-      });
-      row.addEventListener("dragover", function(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        row.classList.add("drag-over");
-      });
-      row.addEventListener("dragleave", function() {
-        row.classList.remove("drag-over");
-      });
-      row.addEventListener("drop", function(e) {
-        e.preventDefault();
-        row.classList.remove("drag-over");
-        var targetId = parseInt(row.dataset.id, 10);
-        if (dragSrcId === null || dragSrcId === targetId) { return; }
-        reorderProduct(dragSrcId, targetId);
-      });
-    });
-  }
-
-  /* ===== DRAG AND DROP — CARDS (mobile) ===== */
-  var dragSrcCardId = null;
-
-  function initCardDragDrop() {
-    var cards = document.querySelectorAll(".inv-card[draggable]");
-    cards.forEach(function(card) {
-      card.addEventListener("dragstart", function(e) {
-        dragSrcCardId = parseInt(card.dataset.id, 10);
-        card.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-      });
-      card.addEventListener("dragend", function() {
-        card.classList.remove("dragging");
-        document.querySelectorAll(".inv-card").forEach(function(c) {
-          c.classList.remove("drag-over");
-        });
-      });
-      card.addEventListener("dragover", function(e) {
-        e.preventDefault();
-        card.classList.add("drag-over");
-      });
-      card.addEventListener("dragleave", function() {
-        card.classList.remove("drag-over");
-      });
-      card.addEventListener("drop", function(e) {
-        e.preventDefault();
-        card.classList.remove("drag-over");
-        var targetId = parseInt(card.dataset.id, 10);
-        if (dragSrcCardId === null || dragSrcCardId === targetId) { return; }
-        reorderProduct(dragSrcCardId, targetId);
-      });
-    });
-  }
-
-  /* Move product in array and persist */
-  function reorderProduct(srcId, tgtId) {
+  function reorderByIndex(oldIndex, newIndex) {
     var prods = S().productos;
-    var srcIdx = prods.findIndex(function(p) { return p.id === srcId; });
-    var tgtIdx = prods.findIndex(function(p) { return p.id === tgtId; });
-    if (srcIdx < 0 || tgtIdx < 0) { return; }
-    var moved = prods.splice(srcIdx, 1)[0];
-    prods.splice(tgtIdx, 0, moved);
-    sortField = null; /* clear sort so manual order is preserved */
+    var moved = prods.splice(oldIndex, 1)[0];
+    prods.splice(newIndex, 0, moved);
+    prods.forEach(function(p, i) { p.id = i + 1; });
+    sortField = null;
     save();
     render();
+  }
+
+  function initDragDrop() {
+    var tbody = document.getElementById("tableBody");
+    if (!tbody || typeof Sortable === "undefined") { return; }
+    if (sortableTable) { sortableTable.destroy(); }
+    sortableTable = Sortable.create(tbody, {
+      animation:   150,
+      handle:      ".drag-handle",
+      ghostClass:  "drag-ghost",
+      chosenClass: "drag-chosen",
+      onEnd: function(evt) {
+        reorderByIndex(evt.oldIndex, evt.newIndex);
+      }
+    });
+  }
+
+  function initCardDragDrop() {
+    var cl = document.getElementById("cardList");
+    if (!cl || typeof Sortable === "undefined") { return; }
+    if (sortableCards) { sortableCards.destroy(); }
+    sortableCards = Sortable.create(cl, {
+      animation:   150,
+      handle:      ".drag-handle-card",
+      ghostClass:  "drag-ghost",
+      chosenClass: "drag-chosen",
+      onEnd: function(evt) {
+        reorderByIndex(evt.oldIndex, evt.newIndex);
+      }
+    });
   }
 
   /* ===== PRODUCT MODAL ===== */
@@ -788,7 +833,7 @@
   function abrirDelModal(id) {
     pendingDel=id;
     var p=ps().find(function(x){return x.id===id;});
-    document.getElementById("delProductName").textContent='"'+p.nombre+'"?';
+    document.getElementById("delProductName").textContent = '"'+escapeHTML(p.nombre)+'"?';
     document.getElementById("delOverlay").classList.add("open");
   }
   function closeDelModal() { document.getElementById("delOverlay").classList.remove("open"); pendingDel=null; }
@@ -797,7 +842,7 @@
     var p=ps().find(function(x){return x.id===pendingDel;});
     S().productos=S().productos.filter(function(x){return x.id!==pendingDel;});
     save(); render(); closeDelModal();
-    toast('"'+p.nombre+'" '+tr("toastDeleted"));
+    toast('"'+escapeHTML(p.nombre)+'" '+tr("toastDeleted"));
   }
   document.getElementById("delOverlay").addEventListener("click",function(e){if(e.target===e.currentTarget){closeDelModal();}});
   window.abrirDelModal=abrirDelModal; window.closeDelModal=closeDelModal; window.confirmarEliminar=confirmarEliminar;
@@ -806,8 +851,8 @@
   function openAdj(id) {
     adjId=id; adjMode="entrada";
     var p=ps().find(function(x){return x.id===id;});
-    document.getElementById("adjName").textContent=p.nombre;
-    document.getElementById("adjCurrent").textContent=tr("adjCurrent")+" "+p.cantidad+" "+p.unidad;
+    document.getElementById("adjName").textContent = escapeHTML(p.nombre);
+    document.getElementById("adjCurrent").textContent = tr("adjCurrent")+" "+escapeHTML(p.cantidad)+" "+escapeHTML(p.unidad);
     document.getElementById("adjQty").value="";
     document.getElementById("adjPreview").textContent=tr("adjPrompt");
     setAdjMode("entrada");
@@ -848,7 +893,7 @@
     if (nuevo<0) { toast(tr("toastNegStock")); return; }
     p.cantidad=Math.round(nuevo*100)/100;
     save(); render(); closeAdj();
-    toast('"'+p.nombre+'": '+p.cantidad+" "+p.unidad);
+    toast('"'+escapeHTML(p.nombre)+'": '+escapeHTML(p.cantidad)+" "+escapeHTML(p.unidad));
   }
   window.openAdj=openAdj; window.closeAdj=closeAdj;
   window.setAdjMode=setAdjMode; window.updatePreview=updatePreview; window.confirmarAjuste=confirmarAjuste;
@@ -950,8 +995,8 @@
 
       h += "<div class=\"mgr-item\">";
       h += "<div class=\"mgr-dot\" style=\"background:" + p.color + "\"></div>";
-      h += "<input class=\"mgr-input\" type=\"text\" value=\"" + c + "\" data-idx=\"" + i + "\">";
-      h += "<span class=\"mgr-other-lang\">" + otherLabel + "</span>";
+      h += "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(c) + "\" data-idx=\"" + i + "\">";
+      h += "<span class=\"mgr-other-lang\">" + escapeHTML(otherLabel) + "</span>";
       h += "<button class=\"mgr-del\" data-delidx=\"" + i + "\">&#10005;</button>";
       h += "</div>";
     }
@@ -977,7 +1022,7 @@
     for (var i = 0; i < tempCats.length; i++) { if (i !== idx) { first = tempCats[i]; break; } }
     openGC({
       icon: "!", title: tr("gcDelCatTitle"),
-      msg1: tr("gcDelMsg1Cat"), name: '"' + cat + '"?',
+      msg1: tr("gcDelMsg1Cat"), name: '"' + escapeHTML(cat) + '"?',
       msg2: inUse ? tr("gcDelMsg2Use") : tr("gcDelMsg2NoUse"),
       confirmLabel: tr("delConfirm"), cancelLabel: tr("cancel"),
       onConfirm: function() {
@@ -1114,8 +1159,8 @@
         : (reverse[u] ? " / " + reverse[u] : "");
       h += "<div class=\"mgr-item\">";
       h += "<div class=\"mgr-dot\" style=\"background:var(--gold)\"></div>";
-      h += "<input class=\"mgr-input\" type=\"text\" value=\"" + u + "\" data-idx=\"" + i + "\">";
-      h += "<span class=\"mgr-other-lang\">" + otherLabel + "</span>";
+      h += "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(u) + "\" data-idx=\"" + i + "\">";
+      h += "<span class=\"mgr-other-lang\">" + escapeHTML(otherLabel) + "</span>";
       h += "<button class=\"mgr-del\" data-delidx=\"" + i + "\">&#10005;</button>";
       h += "</div>";
     }
@@ -1141,7 +1186,7 @@
     for (var i = 0; i < tempUnits.length; i++) { if (i !== idx) { first = tempUnits[i]; break; } }
     openGC({
       icon: "!", title: tr("gcDelUnitTitle"),
-      msg1: tr("gcDelMsg1Unit"), name: '"' + u + '"?',
+      msg1: tr("gcDelMsg1Unit"), name: '"' + escapeHTML(u) + '"?',
       msg2: inUse ? tr("gcDelMsg2Use") : tr("gcDelMsg2NoUse"),
       confirmLabel: tr("delConfirm"), cancelLabel: tr("cancel"),
       onConfirm: function() {
@@ -1472,7 +1517,12 @@
   });
 
   /* Search */
-  document.getElementById("searchInput").addEventListener("input", render);
+  /* Search with debounce — avoids re-rendering on every keystroke */
+  var searchTimer;
+  document.getElementById("searchInput").addEventListener("input", function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(render, 150);
+  });
 
   /* Table sort headers — delegated since th has no id for sort direction */
   document.getElementById("thNombre").addEventListener("click",   function(){ sortBy("nombre"); });
