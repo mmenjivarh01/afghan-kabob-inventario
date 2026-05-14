@@ -671,7 +671,9 @@
       h+="<td class=\"mono-cell diff-cell "+diffClass+"\">"+diffSign+diff+"</td>";
       h+="<td class=\"mono-cell small-cell\">"+escapeHTML(p.unidad)+"</td>";
       h+="<td>"+statusEl(st)+"</td>";
-      h+="<td><button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
+      h+="<td>";
+      h+="<button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">&#9881;</button>";
+      h+="<button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
       h+="<button class=\"action-btn del\" data-id=\""+p.id+"\" data-action=\"del\" aria-label=\"Eliminar\">&#10005;</button></td>";
       h+="</tr>";
     });
@@ -707,7 +709,8 @@
       h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblDiff+"</span><span class=\"card-field-value "+diffClass+"\">"+diffSign+diff+" "+p.unidad+"</span></div>";
       h+="</div>";
       h+="<div class=\"card-actions\">";
-            h+="<button class=\"card-btn-icon\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
+            h+="<button class=\"card-btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">&#9881; "+(lang==="es"?"Ajustar":"Adjust")+"</button>";
+      h+="<button class=\"card-btn-icon\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
       h+="<button class=\"card-btn-icon del\" data-id=\""+p.id+"\" data-action=\"del\" aria-label=\"Eliminar\">&#10005;</button>";
       h+="</div></div>";
     });
@@ -1396,6 +1399,7 @@
     var id     = parseInt(btn.dataset.id, 10);
     var action = btn.dataset.action;
     if (action === "edit") { editarProducto(id); }
+    if (action === "adj")  { openAdj(id); }
     if (action === "del")  { abrirDelModal(id); }
   });
 
@@ -1459,6 +1463,13 @@
   wire("btnUnitMgr", openUnitMgr);
 
   /* Product modal */
+  wire("btnCloseAdj",  closeAdj);
+  wire("btnAdjCancel", closeAdj);
+  wire("btnAdjConfirm", confirmarAjuste);
+  wire("tabEntrada", function() { setAdjMode("entrada"); });
+  wire("tabSalida",  function() { setAdjMode("salida"); });
+  wire("tabFijar",   function() { setAdjMode("directo"); });
+  document.getElementById("adjQty").addEventListener("input", updatePreview);
   wire("btnCloseModal", closeModal);
   wire("btnModalCancel", closeModal);
   wire("btnModalSave",   guardarProducto);
