@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <meta http-equiv="origin-trial" content="">
+  <!--
+    Desactiva el oscurecimiento automatico de Edge/Chromium.
+    "Automatically darken web pages" en Edge ignora CSS y JS —
+    esta meta tag le indica al navegador que la pagina ya
+    tiene su propio esquema de color y no debe ser modificada.
+  -->
+  <meta name="color-scheme" content="light only">
+  <title>Inventario Afghan Kabob &amp; Grill</title>
+
+  <!--
+    BLOQUEO DE MODO OSCURO — se ejecuta ANTES de cargar el CSS.
+    Funciona en Chrome, Edge, Firefox, Safari y sus versiones moviles.
+  -->
+  <script>
+    (function() {
+      var LIGHT = {
+        "--bg":         "#eef2ee",
+        "--surface":    "#f7faf7",
+        "--surface2":   "#eff4ef",
+        "--border":     "#c8d8c8",
+        "--gold":       "#b8922a",
+        "--gold-light": "#d4a93a",
+        "--red":        "#c0392b",
+        "--green":      "#27845a",
+        "--yellow":     "#c07a10",
+        "--text":       "#1a231a",
+        "--muted":      "#5a6e5a"
+      };
+
+      function applyLight() {
+        var root = document.documentElement;
+        /* 1. Forzar color-scheme en el elemento raiz */
+        root.style.colorScheme = "light";
+        root.setAttribute("data-forced-theme", "light");
+
+        /* 2. Aplicar todas las variables CSS directamente en el elemento raiz */
+        Object.keys(LIGHT).forEach(function(k) {
+          root.style.setProperty(k, LIGHT[k]);
+        });
+
+        /* 3. Forzar fondo y color de texto en html y body */
+        root.style.backgroundColor = "#eef2ee";
+        root.style.color           = "#1a231a";
+        if (document.body) {
+          document.body.style.backgroundColor = "#eef2ee";
+          document.body.style.color           = "#1a231a";
+        }
+      }
+
+      /* Aplicar inmediatamente */
+      applyLight();
+
+      /* Volver a aplicar cuando el DOM este listo (por si body no existia) */
+      document.addEventListener("DOMContentLoaded", applyLight);
+
+      /* Escuchar cambios del SO en tiempo real */
+      if (window.matchMedia) {
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyLight);
+      }
+    })();
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<!-- ENCABEZADO -->
+<header role="banner">
+  <div class="logo">
+    <span class="logo-title">Afghan Kabob &amp; Grill</span>
+    <span class="logo-sub" id="hLogoSub" aria-label="Modulo">Inventario</span>
+  </div>
+  <div class="header-right">
+    <span class="header-date" id="headerDate" aria-live="polite"></span>
+    <button type="button" class="btn-sm" id="btnLang" aria-label="Cambiar idioma">EN</button>
+    <button type="button" class="btn-sm" id="btnPrint" aria-label="Imprimir o descargar PDF">Imprimir / PDF</button>
+  </div>
+</header>
+
+<!-- SELECTOR DE INVENTARIO -->
+<nav class="inv-switcher" aria-label="Selector de inventario">
+  <button type="button" class="inv-tab active-a" id="tabA" aria-pressed="true">
+    <span class="inv-tab-label" id="tabALabel">Inventario</span>
+    <span class="inv-tab-name inv-accent-a" id="tabAName">Materia Prima</span>
+  </button>
+  <button type="button" class="inv-tab" id="tabB" aria-pressed="false">
+    <span class="inv-tab-label" id="tabBLabel">Inventario</span>
+    <span class="inv-tab-name inv-accent-b" id="tabBName">Producto Terminado</span>
+  </button>
+</nav>
+
+<!-- CONTENIDO PRINCIPAL -->
+<main class="container">
+
+  <!-- Tarjetas de resumen -->
+  <div class="stats-grid" role="region" aria-label="Resumen de inventario">
+    <div class="stat-card" id="cardTotal" role="button" tabindex="0" aria-label="Mostrar todos los productos">
+      <div class="stat-label" id="sLabelTotal">Productos</div>
+      <div class="stat-value" id="statTotal" aria-live="polite">0</div>
+    </div>
+    <div class="stat-card" id="cardLow" role="button" tabindex="0" aria-label="Filtrar productos con bajo stock">
+      <div class="stat-label" id="sLabelLow">Bajo stock</div>
+      <div class="stat-value warn" id="statLow" aria-live="polite">0</div>
+    </div>
+    <div class="stat-card" id="cardOut" role="button" tabindex="0" aria-label="Filtrar productos agotados">
+      <div class="stat-label" id="sLabelOut">Agotados</div>
+      <div class="stat-value danger" id="statOut" aria-live="polite">0</div>
+    </div>
+  </div>
+
+  <!-- Barra de herramientas -->
+  <div class="toolbar" role="search">
+    <div class="toolbar-top">
+      <div class="search-wrap">
+        <span class="search-icon" aria-hidden="true">&#128269;</span>
+        <input type="search" id="searchInput" placeholder="Buscar..." aria-label="Buscar producto">
+      </div>
+      <button type="button" class="btn-add" id="btnAgregar" aria-label="Agregar nuevo producto">
+        + <span id="hBtnAdd">Agregar</span>
+      </button>
+    </div>
+    <div class="filter-scroll" role="group" aria-label="Filtros por categoria">
+      <div id="filterBtns" class="filter-btns-wrap"></div>
+      <button type="button" class="btn-mgr" id="btnCatMgr" aria-label="Gestionar categorias">
+        &#9881; <span id="hBtnCat">Categorias</span>
+      </button>
+      <button type="button" class="btn-mgr" id="btnUnitMgr" aria-label="Gestionar unidades">
+        &#9881; <span id="hBtnUnit">Unidades</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabla de productos (escritorio) -->
+  <div class="table-wrap">
+    <table aria-label="Lista de productos en inventario">
+      <thead>
+        <tr>
+          <th scope="col" aria-label="Reordenar"></th>
+          <th scope="col" id="thNombre">Producto</th>
+          <th scope="col" id="thCategoria">Categoria</th>
+          <th scope="col" id="thCantidad">Stock</th>
+          <th scope="col" id="thMinimo">Minimo</th>
+          <th scope="col" id="thDiff">Diferencia</th>
+          <th scope="col" id="thUnidad">Unidad</th>
+          <th scope="col" id="thEstado">Estado</th>
+          <th scope="col" aria-label="Acciones"></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Tarjetas de productos (movil) -->
+  <div class="card-list" id="cardList" aria-label="Lista de productos" aria-live="polite"></div>
+
+</main>
+
+<!-- MODAL: Agregar / Editar producto -->
+<div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <button type="button" class="modal-close" id="btnCloseModal" aria-label="Cerrar">&#10005;</button>
+    <div class="modal-title" id="modalTitle">Agregar Producto</div>
+    <input type="hidden" id="editId">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fNombreES" id="lNombreES">&#127466;&#127480; Nombre en Espanol</label>
+        <input type="text" id="fNombreES" autocomplete="off" aria-labelledby="lNombreES">
+      </div>
+      <div class="form-group">
+        <label for="fNombreEN" id="lNombreEN">&#127468;&#127463; Name in English</label>
+        <input type="text" id="fNombreEN" autocomplete="off" aria-labelledby="lNombreEN">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fCategoria" id="lCategoria">Categoria</label>
+        <select id="fCategoria" aria-labelledby="lCategoria"></select>
+      </div>
+      <div class="form-group">
+        <label for="fUnidad" id="lUnidad">Unidad</label>
+        <select id="fUnidad" aria-labelledby="lUnidad"></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fCantidad" id="lCantidad">Cantidad actual</label>
+        <input type="number" id="fCantidad" min="0" step="0.1" aria-labelledby="lCantidad">
+      </div>
+      <div class="form-group">
+        <label for="fMinimo" id="lMinimo">Stock minimo</label>
+        <input type="number" id="fMinimo" min="0" step="0.1" aria-labelledby="lMinimo">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="btnModalCancel">Cancelar</button>
+      <button type="button" class="btn-save" id="btnModalSave">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Ajustar stock -->
+<div class="modal-overlay" id="adjOverlay" role="dialog" aria-modal="true" aria-labelledby="adjTitle">
+  <div class="modal modal-sm">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <button type="button" class="modal-close" id="btnCloseAdj" aria-label="Cerrar">&#10005;</button>
+    <div class="modal-title" id="adjTitle">Ajustar Stock</div>
+    <div class="adj-product-name" id="adjName"></div>
+    <div class="adj-current" id="adjCurrent"></div>
+    <div class="adj-tabs" role="group" aria-label="Tipo de ajuste">
+      <button type="button" class="adj-tab active" data-mode="entrada" id="tabEntrada">+ Entrada</button>
+      <button type="button" class="adj-tab" data-mode="salida" id="tabSalida">- Salida</button>
+      <button type="button" class="adj-tab" data-mode="directo" id="tabFijar">= Fijar</button>
+    </div>
+    <div class="adj-field">
+      <label for="adjQty" id="adjLabel">Cantidad</label>
+      <input type="number" id="adjQty" min="0" step="0.1" placeholder="0" aria-labelledby="adjLabel">
+    </div>
+    <div class="adj-preview" id="adjPreview" aria-live="polite">Ingresa una cantidad</div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="btnAdjCancel">Cancelar</button>
+      <button type="button" class="btn-save" id="btnAdjConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Confirmar eliminar producto -->
+<div class="modal-overlay" id="delOverlay" role="alertdialog" aria-modal="true" aria-labelledby="delTitle" aria-describedby="delMsg1 delProductName delMsg2">
+  <div class="modal modal-xs modal-centered">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <div class="del-confirm-icon" aria-hidden="true">&#128465;</div>
+    <div class="modal-title" id="delTitle" class="modal-title-danger">Eliminar producto</div>
+    <div class="del-confirm-msg" id="delMsg1">Estas seguro de que deseas eliminar</div>
+    <div class="del-confirm-name" id="delProductName">-</div>
+    <div class="del-confirm-msg" id="delMsg2" class="del-confirm-msg-sub">Esta accion no se puede deshacer.</div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="btnDelCancel">Cancelar</button>
+      <button type="button" class="btn-danger" id="btnDelConfirm">Si, eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Gestionar categorias -->
+<div class="modal-overlay" id="catMgrOverlay" role="dialog" aria-modal="true" aria-labelledby="catMgrTitle">
+  <div class="modal modal-md">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <button type="button" class="modal-close" id="btnCloseCatMgr" aria-label="Cerrar">&#10005;</button>
+    <div class="modal-title" id="catMgrTitle">Gestionar Categorias</div>
+    <div class="mgr-section-label" id="catMgrExisting">Categorias existentes</div>
+    <div class="mgr-list" id="catManagerList" aria-label="Lista de categorias"></div>
+    <div class="mgr-divider" role="separator"></div>
+    <div class="mgr-section-label" id="catMgrAdd">Agregar categoria</div>
+    <div class="mgr-add-row">
+      <input type="text" class="mgr-add-input" id="catNewNameES" autocomplete="off"
+             placeholder="&#127466;&#127480; Espanol" aria-label="Nombre en espanol">
+      <input type="text" class="mgr-add-input" id="catNewNameEN" autocomplete="off"
+             placeholder="&#127468;&#127463; English" aria-label="Name in English">
+      <button type="button" class="mgr-add-btn" id="btnAgregarCat" aria-label="Agregar categoria">+</button>
+    </div>
+    <div class="modal-actions modal-actions-top">
+      <button type="button" class="btn-cancel" id="btnCatCancel">Cancelar</button>
+      <button type="button" class="btn-save" id="btnCatSave">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Gestionar unidades -->
+<div class="modal-overlay" id="unitMgrOverlay" role="dialog" aria-modal="true" aria-labelledby="unitMgrTitle">
+  <div class="modal modal-md">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <button type="button" class="modal-close" id="btnCloseUnitMgr" aria-label="Cerrar">&#10005;</button>
+    <div class="modal-title" id="unitMgrTitle">Gestionar Unidades</div>
+    <div class="mgr-section-label" id="unitMgrExisting">Unidades existentes</div>
+    <div class="mgr-list" id="unitManagerList" aria-label="Lista de unidades"></div>
+    <div class="mgr-divider" role="separator"></div>
+    <div class="mgr-section-label" id="unitMgrAdd">Agregar unidad</div>
+    <div class="mgr-add-row">
+      <input type="text" class="mgr-add-input" id="unitNewNameES" autocomplete="off"
+             placeholder="&#127466;&#127480; Espanol" aria-label="Nombre en espanol">
+      <input type="text" class="mgr-add-input" id="unitNewNameEN" autocomplete="off"
+             placeholder="&#127468;&#127463; English" aria-label="Name in English">
+      <button type="button" class="mgr-add-btn" id="btnAgregarUnit" aria-label="Agregar unidad">+</button>
+    </div>
+    <div class="modal-actions modal-actions-top">
+      <button type="button" class="btn-cancel" id="btnUnitCancel">Cancelar</button>
+      <button type="button" class="btn-save" id="btnUnitSave">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Confirmacion generica (eliminar categoria/unidad) -->
+<div class="modal-overlay" id="gcOverlay" role="alertdialog" aria-modal="true" aria-labelledby="gcTitle" aria-describedby="gcMsg1 gcName gcMsg2">
+  <div class="modal modal-xs modal-centered">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <div class="del-confirm-icon" id="gcIcon" aria-hidden="true">!</div>
+    <div class="modal-title" id="gcTitle" class="modal-title-danger"></div>
+    <div class="del-confirm-msg" id="gcMsg1"></div>
+    <div class="del-confirm-name" id="gcName"></div>
+    <div class="del-confirm-msg" id="gcMsg2" class="del-confirm-msg-sub"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="gcBtnCancel">Cancelar</button>
+      <button type="button" class="btn-danger" id="gcBtnConfirm">Si, eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- VISTA PREVIA DE IMPRESION -->
+<div id="printPreviewOverlay" role="dialog" aria-modal="true" aria-labelledby="hPreviewTitle">
+  <div class="print-preview-shell">
+    <div class="preview-toolbar">
+      <span class="preview-toolbar-title" id="hPreviewTitle">Vista previa</span>
+      <div class="preview-toolbar-actions">
+        <select id="reportFilter" class="report-filter-select" aria-label="Filtrar informe">
+          <option value="todos" id="rFilterAll">Todos los productos</option>
+          <option value="bajo" id="rFilterLow">Solo bajo stock / agotados</option>
+        </select>
+        <button type="button" class="btn-preview-close" id="hPreviewClose">Cerrar</button>
+        <button type="button" class="btn-preview-pdf" id="hPreviewPDF">Descargar PDF</button>
+        <button type="button" class="btn-preview-print" id="hPreviewPrint">Imprimir</button>
+      </div>
+    </div>
+    <div class="preview-scroll">
+      <div class="preview-page" id="previewPage" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Destino de impresion -->
+<div id="printDoc" aria-hidden="true"></div>
+
+<!-- Notificaciones -->
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <!-- Configuracion Firebase -->
+  <script>
+    var firebaseConfig = {
+      apiKey:            "AIzaSyCHYsMjL6R8VvsZFheyxwS1EFO8OdfWiT8",
+      authDomain:        "afghan-kabob-inventario.firebaseapp.com",
+      databaseURL:       "https://afghan-kabob-inventario-default-rtdb.firebaseio.com",
+      projectId:         "afghan-kabob-inventario",
+      storageBucket:     "afghan-kabob-inventario.firebasestorage.app",
+      messagingSenderId: "522177436993",
+      appId:             "1:522177436993:web:d1082ca3fbbe76753f95c0"
+    };
+    firebase.initializeApp(firebaseConfig);
+  </script>
+
+  <!-- Logica de la aplicacion -->
+  <script src="app.js"></script>
+</body>
+</html>
