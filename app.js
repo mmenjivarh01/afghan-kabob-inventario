@@ -312,6 +312,23 @@
 
   /* Listen for real-time changes from other users */
   function listenFirebase() {
+    var loaded = { a: false, b: false };
+
+    function hideLoading() {
+      var overlay = document.getElementById("loadingOverlay");
+      if (overlay) {
+        overlay.classList.add("hidden");
+        setTimeout(function() { overlay.style.display = "none"; }, 400);
+      }
+    }
+
+    function checkAllLoaded() {
+      if (loaded.a && loaded.b) {
+        render();
+        hideLoading();
+      }
+    }
+
     ["a","b"].forEach(function(inv) {
       db.ref("inventario/" + inv).on("value", function(snapshot) {
         var data = snapshot.val();
@@ -325,6 +342,8 @@
             cattrans:   {},
             unittrans:  {}
           });
+          loaded[inv] = true;
+          checkAllLoaded();
           return;
         }
         if (data.productos)  { state[inv].productos  = data.productos; }
@@ -332,9 +351,17 @@
         if (data.unidades)   { state[inv].unidades   = data.unidades; }
         if (data.cattrans)   { catTransCache[inv]    = data.cattrans; }
         if (data.unittrans)  { unitTransCache[inv]   = data.unittrans; }
-        if (inv === activeInv) {
-          if (filterCat !== "todos" && cs().indexOf(filterCat) < 0) { filterCat = "todos"; }
-          render();
+
+        if (!loaded[inv]) {
+          /* First load complete for this inventory */
+          loaded[inv] = true;
+          checkAllLoaded();
+        } else {
+          /* Subsequent real-time update */
+          if (inv === activeInv) {
+            if (filterCat !== "todos" && cs().indexOf(filterCat) < 0) { filterCat = "todos"; }
+            render();
+          }
         }
       });
     });
@@ -411,6 +438,9 @@
       if (el) { el.textContent = tr(m[id]); }
     });
     document.getElementById("searchInput").placeholder = tr("search");
+    /* Update loading text language */
+    var lt = document.getElementById("loadingText");
+    if (lt) { lt.textContent = lang === "es" ? "Cargando inventario..." : "Loading inventory..."; }
     /* Update report filter options */
     var rAll = document.getElementById("rFilterAll");
     var rLow = document.getElementById("rFilterLow");
