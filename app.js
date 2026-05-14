@@ -363,8 +363,18 @@
           /* productos key missing but node exists — user deleted all products */
           state[inv].productos = [];
         }
-        if (data.categorias) { state[inv].categorias = data.categorias; }
-        if (data.unidades)   { state[inv].unidades   = data.unidades; }
+        /* Handle categorias: filter nulls */
+        if (data.categorias) {
+          state[inv].categorias = Array.isArray(data.categorias)
+            ? data.categorias.filter(function(c) { return c !== null && c !== undefined && c !== ""; })
+            : state[inv].categorias;
+        }
+        /* Handle unidades: filter nulls */
+        if (data.unidades) {
+          state[inv].unidades = Array.isArray(data.unidades)
+            ? data.unidades.filter(function(u) { return u !== null && u !== undefined && u !== ""; })
+            : state[inv].unidades;
+        }
         if (data.cattrans)   { catTransCache[inv]    = data.cattrans; }
         if (data.unittrans)  { unitTransCache[inv]   = data.unittrans; }
 
@@ -1032,6 +1042,7 @@
       }
     });
     S().categorias = tempCats;
+    catTransCache[activeInv] = tempCatTrans;
     saveCatTransFB(activeInv, tempCatTrans);
     save();
     if (filterCat !== "todos" && S().categorias.indexOf(filterCat) < 0) { filterCat = "todos"; }
@@ -1190,6 +1201,7 @@
       }
     });
     S().unidades = tempUnits;
+    unitTransCache[activeInv] = tempUnitTrans;
     saveUnitTransFB(activeInv, tempUnitTrans);
     save();
     render(); closeUnitMgr(); toast(tr("toastUnitUpdated"));
