@@ -297,7 +297,13 @@
 
   /* Save to Firebase */
   function saveState(inv) {
-    dbRef(inv, "productos").set(state[inv].productos);
+    /* Firebase deletes nodes when arrays are empty.
+       We store a special marker so we can distinguish
+       "intentionally empty" from "never initialized". */
+    var prods = state[inv].productos.length > 0
+      ? state[inv].productos
+      : ["__empty__"];
+    dbRef(inv, "productos").set(prods);
     dbRef(inv, "categorias").set(state[inv].categorias);
     dbRef(inv, "unidades").set(state[inv].unidades);
   }
@@ -333,7 +339,7 @@
       db.ref("inventario/" + inv).on("value", function(snapshot) {
         var data = snapshot.val();
         if (!data) {
-          /* First time — push defaults to Firebase */
+          /* Firebase returned null — node never existed, push defaults */
           var def = DEFAULTS(inv);
           db.ref("inventario/" + inv).set({
             productos:  def.productos.map(function(x){return Object.assign({},x);}),
@@ -346,7 +352,17 @@
           checkAllLoaded();
           return;
         }
-        if (data.productos)  { state[inv].productos  = data.productos; }
+
+        /* Handle productos: filter out the empty marker */
+        if (data.productos) {
+          var prods = Array.isArray(data.productos)
+            ? data.productos.filter(function(p) { return p !== "__empty__" && p !== null; })
+            : [];
+          state[inv].productos = prods;
+        } else {
+          /* productos key missing but node exists — user deleted all products */
+          state[inv].productos = [];
+        }
         if (data.categorias) { state[inv].categorias = data.categorias; }
         if (data.unidades)   { state[inv].unidades   = data.unidades; }
         if (data.cattrans)   { catTransCache[inv]    = data.cattrans; }
