@@ -656,7 +656,6 @@
     list.forEach(function(p) {
       var st  = stockStatus(p);
       var pct = p.minimo>0 ? Math.min(100,(p.cantidad/(p.minimo*2))*100) : 100;
-      var adj = lang==="es" ? "Ajustar" : "Adjust";
       var diff      = p.cantidad - p.minimo;
       var diffSign  = diff > 0 ? "+" : "";
       var diffClass = diff > 0 ? "ok-color" : diff === 0 ? "" : "danger-color";
@@ -667,8 +666,7 @@
       h+="<td><div class=\"stock-cell\">";
       h+="<div class=\"bar-bg\"><div class=\"bar-fill\" style=\"width:"+pct+"%;background:"+barClr(st)+"\"></div></div>";
       h+="<span class=\"stock-num "+st+"-color\">"+escapeHTML(p.cantidad)+"</span>";
-      h+="<button class=\"btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">+/- "+adj+"</button>";
-      h+="</div></td>";
+            h+="</div></td>";
       h+="<td class=\"mono-cell\">"+escapeHTML(p.minimo)+"</td>";
       h+="<td class=\"mono-cell diff-cell "+diffClass+"\">"+diffSign+diff+"</td>";
       h+="<td class=\"mono-cell small-cell\">"+escapeHTML(p.unidad)+"</td>";
@@ -690,7 +688,6 @@
     var h="";
     list.forEach(function(p) {
       var st   = stockStatus(p);
-      var adj  = lang==="es" ? "Ajustar stock" : "Adjust stock";
       var diff = p.cantidad - p.minimo;
       var diffSign  = diff > 0 ? "+" : "";
       var diffClass = diff > 0 ? "ok-color" : diff === 0 ? "" : "danger-color";
@@ -710,8 +707,7 @@
       h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblDiff+"</span><span class=\"card-field-value "+diffClass+"\">"+diffSign+diff+" "+p.unidad+"</span></div>";
       h+="</div>";
       h+="<div class=\"card-actions\">";
-      h+="<button class=\"card-btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\">"+adj+"</button>";
-      h+="<button class=\"card-btn-icon\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
+            h+="<button class=\"card-btn-icon\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
       h+="<button class=\"card-btn-icon del\" data-id=\""+p.id+"\" data-action=\"del\" aria-label=\"Eliminar\">&#10005;</button>";
       h+="</div></div>";
     });
@@ -1401,7 +1397,6 @@
     var action = btn.dataset.action;
     if (action === "edit") { editarProducto(id); }
     if (action === "del")  { abrirDelModal(id); }
-    if (action === "adj")  { openAdj(id); }
   });
 
   /* ===== FORCE LIGHT MODE via JS (backup for browsers ignoring CSS) ===== */
@@ -1469,13 +1464,6 @@
   wire("btnModalSave",   guardarProducto);
 
   /* Adjust stock modal */
-  wire("btnCloseAdj",  closeAdj);
-  wire("btnAdjCancel", closeAdj);
-  wire("btnAdjConfirm", confirmarAjuste);
-  wire("tabEntrada", function() { setAdjMode("entrada"); });
-  wire("tabSalida",  function() { setAdjMode("salida"); });
-  wire("tabFijar",   function() { setAdjMode("directo"); });
-  document.getElementById("adjQty").addEventListener("input", updatePreview);
 
   /* Delete modal */
   wire("btnDelCancel",  closeDelModal);
