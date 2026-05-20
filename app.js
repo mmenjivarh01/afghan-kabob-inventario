@@ -687,27 +687,36 @@
   /* ===== FIREBASE AUTH STATE OBSERVER ===== */
   /* Show login screen while waiting */
   showLogin();
+
+  /* Safety timeout — if auth takes too long on iOS PWA, show login anyway */
+  var authTimeout = setTimeout(function() {
+    if (!authReady && !isGuest) {
+      console.warn("[Inventario] Auth timeout — mostrando login");
+      showLogin();
+    }
+  }, 8000);
+
   auth.onAuthStateChanged(function(user) {
+    clearTimeout(authTimeout);
     if (user) {
       /* Check for pending password reset */
-      db.ref("pendingReset/" + user.uid).once("value").then(function(snap) {
-        var reset = snap.val();
-        if (reset && reset.newPass) {
-          return user.updatePassword(reset.newPass).then(function() {
-            return db.ref("pendingReset/" + user.uid).remove();
-          });
-        }
-      }).catch(function(){});
-
+      if (db) {
+        db.ref("pendingReset/" + user.uid).once("value").then(function(snap) {
+          var reset = snap.val();
+          if (reset && reset.newPass) {
+            return user.updatePassword(reset.newPass).then(function() {
+              return db.ref("pendingReset/" + user.uid).remove();
+            });
+          }
+        }).catch(function(){});
+      }
       loadUserProfile(user.uid, user.displayName || user.email.split("@")[0], user.email)
         .catch(function() {
-          /* Profile load failed — still let them in */
           currentUser = { uid: user.uid, username: user.email.split("@")[0], email: user.email, role: "usuario" };
           isGuest = false;
           onLoginSuccess();
         });
     } else {
-      /* Not logged in — show login */
       if (!isGuest) { showLogin(); }
     }
   });
@@ -716,21 +725,15 @@
 
   /* ===== FIREBASE DATABASE REFERENCE ===== */
   if (!window.firebase || !window.firebase.database) {
-    console.error("[Inventario] Firebase no cargo correctamente. Verifica tu conexion a internet.");
-    document.getElementById("loadingText").textContent =
-      "Error: no se pudo conectar con Firebase. Verifica tu conexion.";
-    document.getElementById("loadingText").style.color = "#c0392b";
-    return;
-  }
-
-  try {
-    db = firebase.database();
-  } catch(e) {
-    console.error("[Inventario] Error al inicializar Firebase:", e);
-    document.getElementById("loadingText").textContent =
-      "Error al inicializar la base de datos. Recarga la pagina.";
-    document.getElementById("loadingText").style.color = "#c0392b";
-    return;
+    console.error("[Inventario] Firebase no cargo correctamente.");
+    /* Don't block — show login anyway, user will see error when trying to load data */
+    showLogin();
+  } else {
+    try {
+      db = firebase.database();
+    } catch(e) {
+      console.error("[Inventario] Error al inicializar Firebase:", e);
+    }
   }
 
   function dbRef(inv, key) {
