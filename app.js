@@ -1438,7 +1438,7 @@
     }, 150);
   }
   function closeModal() { document.getElementById("modalOverlay").classList.remove("open"); }
-  document.getElementById("modalOverlay").addEventListener("click",function(e){if(e.target===e.currentTarget){closeModal();}});
+  /* modalOverlay: NO cierra al hacer clic en el fondo — usar X o Cancelar */
 
   function guardarProducto() {
     var nombreES  = document.getElementById("fNombreES").value.trim();
@@ -1521,7 +1521,7 @@
     setTimeout(function(){document.getElementById("adjQty").focus();},150);
   }
   function closeAdj() { document.getElementById("adjOverlay").classList.remove("open"); }
-  document.getElementById("adjOverlay").addEventListener("click",function(e){if(e.target===e.currentTarget){closeAdj();}});
+  /* adjOverlay: NO cierra al hacer clic en el fondo — usar X o Cancelar */
   function setAdjMode(mode) {
     adjMode=mode;
     document.querySelectorAll(".adj-tab").forEach(function(t){t.classList.toggle("active",t.dataset.mode===mode);});
@@ -1577,7 +1577,7 @@
   }
   function closeGC() { document.getElementById("gcOverlay").classList.remove("open"); gcCb=null; }
   document.getElementById("gcBtnConfirm").addEventListener("click",function(){if(gcCb){gcCb();} closeGC();});
-  document.getElementById("gcOverlay").addEventListener("click",function(e){if(e.target===e.currentTarget){closeGC();}});
+  /* gcOverlay: NO cierra al hacer clic en el fondo — usar X o Cancelar */
   window.closeGC=closeGC;
 
   /* ===== CATEGORY MANAGER ===== */
@@ -2068,7 +2068,7 @@
     document.getElementById("printPreviewOverlay").classList.add("open");
   }
   function cerrarVistaPrevia() { document.getElementById("printPreviewOverlay").classList.remove("open"); }
-  document.getElementById("printPreviewOverlay").addEventListener("click",function(e){if(e.target===e.currentTarget){cerrarVistaPrevia();}});
+  /* printPreviewOverlay: NO cierra al hacer clic en el fondo — usar X */
   function imprimirDesdePrevia() {
     var pd = document.getElementById("printDoc");
     pd.innerHTML = "<style>"+PCSS+"</style>"+buildReport(getReportFilter());
@@ -2367,8 +2367,7 @@
     if (e.target.closest("#btnChpassSave"))     { saveChpass(); }
     if (e.target.closest("#btnNewUserCancel"))  { showAdminTab("usuarios"); }
     if (e.target.closest("#btnCreateUser"))     { createUser(); }
-    if (e.target.id === "adminOverlay")         { closeAdminPanel(); }
-    if (e.target.id === "chpassOverlay")        { closeChpass(); }
+    /* adminOverlay and chpassOverlay: NO cierran al hacer clic en el fondo */
 
     /* Historial filter buttons */
     var filterBtn = e.target.closest(".hist-filter-btn");
