@@ -931,9 +931,9 @@
           var prodsObj = {};
           def.productos.forEach(function(p) { prodsObj["id_" + p.id] = Object.assign({}, p); });
           var catsObj  = {};
-          def.categorias.forEach(function(c, i) { catsObj["c" + i] = c; });
+          def.categorias.forEach(function(c, i) { catsObj["c" + String(i).padStart(4,"0")] = c; });
           var unitsObj = {};
-          def.unidades.forEach(function(u, i)   { unitsObj["u" + i] = u; });
+          def.unidades.forEach(function(u, i)   { unitsObj["u" + String(i).padStart(4,"0")] = u; });
           db.ref("inventario/" + inv).set({
             productos:  prodsObj,
             categorias: catsObj,
@@ -995,6 +995,12 @@
           if (inv === activeInv) {
             filterCats = filterCats.filter(function(c){ return cs().indexOf(c) >= 0; });
             render();
+            /* If product modal is open, refresh its category and unit selectors */
+            var modalOpen = document.getElementById("modalOverlay");
+            if (modalOpen && modalOpen.classList.contains("open")) {
+              renderCatSelect(document.getElementById("fCategoria").value);
+              renderUnitSelect(document.getElementById("fUnidad").value);
+            }
           }
         }
       }, function(error) {
@@ -1155,14 +1161,18 @@
   function renderSubcatTabs() {
     var wrap = document.getElementById("subcatTabs");
     if (!wrap) { return; }
-    var prods = ps();
 
-    /* Count per subcat */
+    /* Always count from the FULL product list, ignoring active filters */
+    var allProds = ps();
     var counts = {};
     SUBCATS.forEach(function(s) { counts[s.id] = 0; });
-    prods.forEach(function(p) { if (p.subcategoria && counts[p.subcategoria] !== undefined) { counts[p.subcategoria]++; } });
+    allProds.forEach(function(p) {
+      if (p.subcategoria && counts[p.subcategoria] !== undefined) {
+        counts[p.subcategoria]++;
+      }
+    });
 
-    var h = "<button class=\"subcat-all-btn" + (filterSubcat === "todos" ? " active" : "") + "\" id=\"subcatAll\">" + tr("allSubcats") + "</button>";
+    var h = "<button class=\"subcat-all-btn" + (filterSubcat === "todos" ? " active" : "") + "\" id=\"subcatAll\">" + tr("allSubcats") + " <span class=\"subcat-tab-count\" style=\"background:var(--surface2);color:var(--muted)\">" + allProds.length + "</span></button>";
     SUBCATS.forEach(function(s) {
       var isActive = filterSubcat === s.id;
       var cnt = counts[s.id];
@@ -1181,7 +1191,7 @@
       btn.addEventListener("click", function() {
         var id = btn.dataset.subcat;
         filterSubcat = (filterSubcat === id) ? "todos" : id;
-        filterCats = []; /* reset cat filter when subcat changes */
+        filterCats = [];
         renderFilterBtns(); render();
       });
     });
@@ -1604,18 +1614,16 @@
       Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
 
       state[inv].categorias = state[inv].categorias.map(function(c) {
-        if (lang === "en" && trans[c])    { return trans[c]; } /* ES->EN */
-        if (lang === "es" && reverse[c])  { return reverse[c]; } /* EN->ES */
+        if (lang === "en" && trans[c])    { return trans[c]; }
+        if (lang === "es" && reverse[c])  { return reverse[c]; }
         return c;
       });
 
-      /* Update product categories too */
       state[inv].productos.forEach(function(p) {
         if (lang === "en" && trans[p.categoria])   { p.categoria = trans[p.categoria]; }
         if (lang === "es" && reverse[p.categoria]) { p.categoria = reverse[p.categoria]; }
       });
-
-      saveState(inv);
+      /* NOTE: no saveState here — translation is UI-only, not persisted */
     });
     filterCats = filterCats.filter(function(c){ return cs().indexOf(c) >= 0; });
   }
@@ -1817,8 +1825,7 @@
         if (lang === "en" && trans[p.unidad])   { p.unidad = trans[p.unidad]; }
         if (lang === "es" && reverse[p.unidad]) { p.unidad = reverse[p.unidad]; }
       });
-
-      saveState(inv);
+      /* NOTE: no saveState here — translation is UI-only, not persisted */
     });
   }
 
@@ -1944,8 +1951,7 @@
     });
     S().unidades = tempUnits;
     unitTransCache[activeInv] = tempUnitTrans;
-    saveUnitTransFB(activeInv, tempUnitTrans);
-    save();
+    save(); /* unified atomic save — no separate saveUnitTransFB needed */
     render(); closeUnitMgr(); toast(tr("toastUnitUpdated"));
   }
   window.openUnitMgr    = openUnitMgr; window.closeUnitMgr  = closeUnitMgr;
