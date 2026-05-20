@@ -902,6 +902,8 @@
     });
   }
 
+  var fullyLoaded = false;
+
   /* Listen for real-time changes from other users */
   function listenFirebase() {
     var loaded = { a: false, b: false };
@@ -916,6 +918,7 @@
 
     function checkAllLoaded() {
       if (loaded.a && loaded.b) {
+        fullyLoaded = true;
         render();
         hideLoading();
       }
@@ -1161,6 +1164,9 @@
   function renderSubcatTabs() {
     var wrap = document.getElementById("subcatTabs");
     if (!wrap) { return; }
+
+    /* Don't render counts until Firebase has fully loaded both inventories */
+    if (!fullyLoaded) { return; }
 
     /* Always count from the FULL product list, ignoring active filters */
     var allProds = ps();
