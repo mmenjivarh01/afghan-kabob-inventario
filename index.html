@@ -113,6 +113,12 @@
 </div>
 <!-- BANNER INVITADO -->
 <div class="guest-banner" id="guestBanner">👁 Modo Invitado — solo lectura</div>
+
+<!-- AVISO INACTIVIDAD -->
+<div id="inactivityWarning" style="display:none" class="inactivity-warning">
+  <span>⏱ Tu sesión cerrará en <strong id="inactivityCountdown">60</strong> segundos por inactividad.</span>
+  <button type="button" id="btnExtendSession" class="btn-extend">Extender sesión</button>
+</div>
 <nav class="inv-switcher" aria-label="Selector de inventario">
   <button type="button" class="inv-tab active-a" id="tabA" aria-pressed="true">
     <span class="inv-tab-label" id="tabALabel">Inventario</span>
@@ -395,7 +401,7 @@
       <div class="login-form">
         <div class="form-group">
           <label for="loginUser">Usuario</label>
-          <input type="text" id="loginUser" autocomplete="username" placeholder="Ej: Admin">
+          <input type="text" id="loginUser" autocomplete="username" placeholder="Ej: Admin" spellcheck="false">
         </div>
         <div class="form-group" id="loginPassGroup">
           <label for="loginPass">Contraseña</label>
@@ -403,6 +409,10 @@
             <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••">
             <button type="button" class="btn-show-pass" id="btnShowPass" aria-label="Mostrar contraseña">👁</button>
           </div>
+        </div>
+        <div class="login-remember">
+          <input type="checkbox" id="rememberUser">
+          <label for="rememberUser">Recordar usuario</label>
         </div>
         <div class="login-error" id="loginError"></div>
         <button type="button" class="btn-login" id="btnLogin">Ingresar</button>

@@ -353,6 +353,7 @@
     if (main) { main.style.display = "none"; }
     var gb = document.getElementById("guestBanner");
     if (gb) { gb.style.display = "none"; }
+    prefillLoginUser();
   }
 
   function hideLogin() {
@@ -402,21 +403,56 @@
     if (dr) { dr.textContent = isGuest ? "Solo lectura" : (currentUser ? currentUser.role : ""); }
   }
 
+  /* ===== RECORDAR USUARIO ===== */
+  function saveRememberedUser(username) {
+    try { localStorage.setItem("inv_remembered_user", username); } catch(e) {}
+  }
+  function loadRememberedUser() {
+    try { return localStorage.getItem("inv_remembered_user") || ""; } catch(e) { return ""; }
+  }
+  function clearRememberedUser() {
+    try { localStorage.removeItem("inv_remembered_user"); } catch(e) {}
+  }
+
+  /* Pre-fill username on login screen */
+  function prefillLoginUser() {
+    var remembered = loadRememberedUser();
+    var userEl = document.getElementById("loginUser");
+    var rememberEl = document.getElementById("rememberUser");
+    if (remembered && userEl) {
+      userEl.value = remembered;
+      if (rememberEl) { rememberEl.checked = true; }
+      /* Focus password directly */
+      setTimeout(function() {
+        var passEl = document.getElementById("loginPass");
+        if (passEl) { passEl.focus(); }
+      }, 100);
+    }
+  }
+
   /* Login with username + password */
   function doLogin() {
-    var username = document.getElementById("loginUser").value.trim();
-    var password = document.getElementById("loginPass").value;
-    var errEl    = document.getElementById("loginError");
-    var btnLogin = document.getElementById("btnLogin");
+    var username  = document.getElementById("loginUser").value.trim();
+    var password  = document.getElementById("loginPass").value;
+    var remember  = document.getElementById("rememberUser");
+    var errEl     = document.getElementById("loginError");
+    var btnLogin  = document.getElementById("btnLogin");
     if (!username) { errEl.textContent = "Ingresa tu usuario"; return; }
     if (!password) { errEl.textContent = "Ingresa tu contraseña"; return; }
     errEl.textContent = "";
     btnLogin.disabled = true;
     btnLogin.textContent = "Ingresando...";
+
+    /* Save or clear remembered user */
+    if (remember && remember.checked) {
+      saveRememberedUser(username);
+    } else {
+      clearRememberedUser();
+    }
+
     var email = toEmail(username);
     auth.signInWithEmailAndPassword(email, password)
       .then(function(cred) {
-        /* Load profile from DB */
         return loadUserProfile(cred.user.uid, username, email);
       })
       .catch(function(err) {
@@ -458,6 +494,7 @@
   function onLoginSuccess() {
     hideLogin();
     applyUserMode();
+    if (!isGuest) { resetInactivityTimer(); }
     if (!authReady) {
       authReady = true;
       listenFirebase();
@@ -468,19 +505,81 @@
 
   /* Logout */
   function doLogout() {
+    stopInactivityTimer();
     closeUserDropdown();
     if (isGuest) {
       isGuest = false;
       currentUser = null;
       showLogin();
+      prefillLoginUser();
       return;
     }
     auth.signOut().then(function() {
       currentUser = null;
       isGuest = false;
       showLogin();
+      prefillLoginUser();
     });
   }
+
+  /* ===== AUTO-LOGOUT POR INACTIVIDAD ===== */
+  var INACTIVITY_MS      = 15 * 60 * 1000; /* 15 minutos */
+  var WARN_BEFORE_MS     = 60 * 1000;       /* Aviso 1 minuto antes */
+  var inactivityTimer    = null;
+  var inactivityWarnTimer = null;
+  var inactivityWarnEl   = null;
+
+  function resetInactivityTimer() {
+    if (isGuest || !currentUser) { return; }
+    clearTimeout(inactivityTimer);
+    clearTimeout(inactivityWarnTimer);
+    hideInactivityWarning();
+
+    /* Warning 1 minute before logout */
+    inactivityWarnTimer = setTimeout(function() {
+      showInactivityWarning();
+    }, INACTIVITY_MS - WARN_BEFORE_MS);
+
+    /* Auto logout */
+    inactivityTimer = setTimeout(function() {
+      hideInactivityWarning();
+      doLogout();
+      toast("Sesión cerrada por inactividad");
+    }, INACTIVITY_MS);
+  }
+
+  function stopInactivityTimer() {
+    clearTimeout(inactivityTimer);
+    clearTimeout(inactivityWarnTimer);
+    hideInactivityWarning();
+  }
+
+  function showInactivityWarning() {
+    var el = document.getElementById("inactivityWarning");
+    if (el) { el.style.display = "flex"; }
+    /* Countdown */
+    var secs = Math.round(WARN_BEFORE_MS / 1000);
+    var countEl = document.getElementById("inactivityCountdown");
+    if (countEl) { countEl.textContent = secs; }
+    var countDown = setInterval(function() {
+      secs--;
+      if (countEl) { countEl.textContent = secs; }
+      if (secs <= 0) { clearInterval(countDown); }
+    }, 1000);
+  }
+
+  function hideInactivityWarning() {
+    var el = document.getElementById("inactivityWarning");
+    if (el) { el.style.display = "none"; }
+  }
+
+  /* Listen for user activity */
+  var activityEvents = ["click","touchstart","keydown","scroll","mousemove"];
+  activityEvents.forEach(function(evt) {
+    document.addEventListener(evt, function() {
+      if (currentUser && !isGuest) { resetInactivityTimer(); }
+    }, { passive: true });
+  });
 
   /* ===== USER DROPDOWN ===== */
   var dropdownOpen = false;
@@ -754,33 +853,38 @@
   function saveState(inv) {
     if (!db) { console.error("[Inventario] Firebase no disponible"); return; }
 
-    /* Convert productos array to object: { "id_1": {...}, "id_2": {...} } */
     var prodsObj = {};
     if (state[inv].productos.length === 0) {
-      prodsObj["__empty__"] = true; /* marker so node is not deleted by Firebase */
+      prodsObj["__empty__"] = true;
     } else {
       state[inv].productos.forEach(function(p) {
         prodsObj["id_" + p.id] = p;
       });
     }
 
-    /* Convert categorias array to object: { "0": "Carnes", "1": "Verduras" } */
+    /* Use zero-padded keys so Firebase returns them in correct order */
     var catsObj = {};
-    state[inv].categorias.forEach(function(c, i) { catsObj["c" + i] = c; });
+    state[inv].categorias.forEach(function(c, i) {
+      catsObj["c" + String(i).padStart(4,"0")] = c;
+    });
 
-    /* Convert unidades array to object: { "0": "kg", "1": "L" } */
     var unitsObj = {};
-    state[inv].unidades.forEach(function(u, i) { unitsObj["u" + i] = u; });
+    state[inv].unidades.forEach(function(u, i) {
+      unitsObj["u" + String(i).padStart(4,"0")] = u;
+    });
 
-    dbRef(inv, "productos").set(prodsObj).catch(function(e) {
-      console.error("[Inventario] Error guardando productos:", e);
+    /* Save everything in one atomic update */
+    var update = {};
+    update["inventario/" + inv + "/productos"]  = prodsObj;
+    update["inventario/" + inv + "/categorias"] = catsObj;
+    update["inventario/" + inv + "/unidades"]   = unitsObj;
+    update["inventario/" + inv + "/cattrans"]   = catTransCache[inv]  || {};
+    update["inventario/" + inv + "/caticons"]   = catIconsCache[inv]  || {};
+    update["inventario/" + inv + "/unittrans"]  = unitTransCache[inv] || {};
+
+    db.ref().update(update).catch(function(e) {
+      console.error("[Inventario] Error guardando:", e);
       toast("Error al guardar. Verifica tu conexion.");
-    });
-    dbRef(inv, "categorias").set(catsObj).catch(function(e) {
-      console.error("[Inventario] Error guardando categorias:", e);
-    });
-    dbRef(inv, "unidades").set(unitsObj).catch(function(e) {
-      console.error("[Inventario] Error guardando unidades:", e);
     });
   }
 
@@ -1473,7 +1577,14 @@
   function loadCatIcons(inv)  { return catIconsCache[inv]  || {}; }
   function catIcon(cat) {
     var icons = loadCatIcons(activeInv);
-    return icons[cat] || "";
+    if (icons[cat]) { return icons[cat]; }
+    /* Try the other-language equivalent */
+    var trans   = loadCatTrans(activeInv);
+    var reverse = {};
+    Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
+    var other = trans[cat] || reverse[cat];
+    if (other && icons[other]) { return icons[other]; }
+    return "";
   }
   function saveCatIconsFB(inv, map) {
     if (!db) { return; }
@@ -1651,6 +1762,8 @@
         else { delete tempCatIcons[cat]; }
       }
     });
+
+    /* Deduplicate */
     var seen = {};
     tempCats = tempCats.filter(function(c) {
       var k = c.toLowerCase();
@@ -1658,6 +1771,8 @@
       seen[k] = true; return true;
     });
     if (!tempCats.length) { toast(tr("toastMinOne")); return; }
+
+    /* Reassign products whose category was removed */
     var old = cs().slice();
     ps().forEach(function(p) {
       if (tempCats.indexOf(p.categoria) < 0) {
@@ -1665,12 +1780,13 @@
         p.categoria = (i >= 0 && tempCats[i]) ? tempCats[i] : tempCats[0];
       }
     });
+
+    /* Commit to state and save everything in one shot */
     S().categorias = tempCats;
     catTransCache[activeInv] = tempCatTrans;
     catIconsCache[activeInv] = tempCatIcons;
-    saveCatTransFB(activeInv, tempCatTrans);
-    saveCatIconsFB(activeInv, tempCatIcons);
-    save();
+    save(); /* calls saveState which now does one atomic update including caticons */
+
     filterCats = filterCats.filter(function(c){ return S().categorias.indexOf(c) >= 0; });
     renderFilterBtns(); render(); closeCatMgr(); toast(tr("toastCatUpdated"));
   }
@@ -2215,6 +2331,13 @@
     a.download = "historial_afghankabob_" + new Date().toISOString().slice(0,10) + ".csv";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+  }
+
+  var btnExtendSession = document.getElementById("btnExtendSession");
+  if (btnExtendSession) {
+    btnExtendSession.addEventListener("click", function() {
+      resetInactivityTimer();
+    });
   }
 
   var btnHistorial = document.getElementById("btnHistorial");
