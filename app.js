@@ -51,7 +51,9 @@
       gcDelCatTitle:"Eliminar Categoria", gcDelUnitTitle:"Eliminar Unidad",
       gcDelMsg1Cat:"Deseas eliminar la categoria", gcDelMsg1Unit:"Deseas eliminar la unidad",
       gcDelMsg2NoUse:"Esta accion no se puede deshacer.",
-      gcDelMsg2Use:"Los productos afectados seran reasignados. Esta accion no se puede deshacer."
+      gcDelMsg2Use:"Los productos afectados seran reasignados. Esta accion no se puede deshacer.",
+      lSubcat:"Almacenamiento", allSubcats:"Todo",
+      thSubcat:"Almacenamiento"
     },
     en: {
       logoSub:"Inventory", btnLang:"ES", btnPrint:"Print / PDF", invLabel:"Inventory",
@@ -95,40 +97,88 @@
       gcDelCatTitle:"Delete Category", gcDelUnitTitle:"Delete Unit",
       gcDelMsg1Cat:"Delete the category", gcDelMsg1Unit:"Delete the unit",
       gcDelMsg2NoUse:"This action cannot be undone.",
-      gcDelMsg2Use:"Affected products will be reassigned. This action cannot be undone."
+      gcDelMsg2Use:"Affected products will be reassigned. This action cannot be undone.",
+      lSubcat:"Storage type", allSubcats:"All",
+      thSubcat:"Storage"
     }
   };
 
   var lang = localStorage.getItem("inv_lang") || "es";
   function tr(k) { return (T[lang] && T[lang][k]) ? T[lang][k] : k; }
 
-  /* ===== DATA ===== */
-  var activeInv = localStorage.getItem("inv_active") || "a";
+  /* ===== SUBCATEGORÍAS FIJAS (Nivel 2) ===== */
+  var SUBCATS = [
+    { id: "congelados",  iconES: "🧊", labelES: "Congelados",          labelEN: "Frozen" },
+    { id: "refrigerados",iconES: "❄️", labelES: "Refrigerados",        labelEN: "Refrigerated" },
+    { id: "secos",       iconES: "🌾", labelES: "Secos",               labelEN: "Dry Goods" },
+    { id: "limpieza",    iconES: "🧹", labelES: "Productos de Limpieza",labelEN: "Cleaning Products" }
+  ];
+  function subcatIcon(id) {
+    var s = SUBCATS.find(function(x){ return x.id === id; });
+    return s ? s.iconES : "";
+  }
+  function subcatLabel(id) {
+    var s = SUBCATS.find(function(x){ return x.id === id; });
+    if (!s) { return id; }
+    return lang === "es" ? s.labelES : s.labelEN;
+  }
+
+  /* ===== AUTH CONFIG ===== */
+  var ADMIN_EMAIL   = "mmenjivar29@gmail.com";
+  var DOMAIN        = "imenjivar.com";
+  var currentUser   = null;
+  var isGuest       = false;
+  var authReady     = false;
+
+  /* ===== CORE STATE — declared early so AUTH module can reference them ===== */
+  var activeInv     = localStorage.getItem("inv_active") || "a";
+  var db            = null;
+  var state         = { a: null, b: null };
+  var filterSubcat  = "todos", filterCats = [], filterStatus = "todos";
+  var sortField     = null, sortAsc = true;
+  var adjId         = null, adjMode = "entrada", pendingDel = null;
+
+  /* ===== AUDIT LOG ===== */
+  function logAudit(action, details) {
+    if (!db || isGuest) { return; }
+    var who = currentUser ? currentUser.username : "Sistema";
+    var entry = {
+      accion:    action,
+      detalles:  details,
+      usuario:   who,
+      uid:       currentUser ? currentUser.uid : null,
+      inv:       activeInv === "a" ? "Materia Prima" : "Producto Terminado",
+      ts:        Date.now()
+    };
+    db.ref("historial").push(entry).catch(function(e) {
+      console.error("[Audit] Error guardando:", e);
+    });
+  }
 
   /* Datos predeterminados en ESPAÑOL */
   var DEFAULTS_ES = {
     a: {
       productos: [
-        {id:1,nombre:"Pechuga de pollo",  categoria:"Carnes",         cantidad:8, minimo:5, unidad:"kg"},
-        {id:2,nombre:"Res molida",         categoria:"Carnes",         cantidad:3, minimo:4, unidad:"kg"},
-        {id:3,nombre:"Jitomate",           categoria:"Verduras",       cantidad:12,minimo:6, unidad:"kg"},
-        {id:4,nombre:"Cebolla blanca",     categoria:"Verduras",       cantidad:5, minimo:3, unidad:"kg"},
-        {id:5,nombre:"Queso manchego",     categoria:"Lacteos",        cantidad:2, minimo:3, unidad:"kg"},
-        {id:6,nombre:"Leche entera",       categoria:"Lacteos",        cantidad:0, minimo:6, unidad:"L"},
-        {id:7,nombre:"Arroz blanco",       categoria:"Granos",         cantidad:15,minimo:10,unidad:"kg"},
-        {id:8,nombre:"Frijol negro",       categoria:"Granos",         cantidad:7, minimo:5, unidad:"kg"},
-        {id:9,nombre:"Aceite vegetal",     categoria:"Otros",          cantidad:4, minimo:3, unidad:"L"}
+        {id:1,nombre:"Pechuga de pollo",  subcategoria:"congelados",  categoria:"Carnes",         cantidad:8, minimo:5, unidad:"kg"},
+        {id:2,nombre:"Res molida",         subcategoria:"congelados",  categoria:"Carnes",         cantidad:3, minimo:4, unidad:"kg"},
+        {id:3,nombre:"Jitomate",           subcategoria:"refrigerados",categoria:"Verduras",       cantidad:12,minimo:6, unidad:"kg"},
+        {id:4,nombre:"Cebolla blanca",     subcategoria:"refrigerados",categoria:"Verduras",       cantidad:5, minimo:3, unidad:"kg"},
+        {id:5,nombre:"Queso manchego",     subcategoria:"refrigerados",categoria:"Lacteos",        cantidad:2, minimo:3, unidad:"kg"},
+        {id:6,nombre:"Leche entera",       subcategoria:"refrigerados",categoria:"Lacteos",        cantidad:0, minimo:6, unidad:"L"},
+        {id:7,nombre:"Arroz blanco",       subcategoria:"secos",       categoria:"Granos",         cantidad:15,minimo:10,unidad:"kg"},
+        {id:8,nombre:"Frijol negro",       subcategoria:"secos",       categoria:"Granos",         cantidad:7, minimo:5, unidad:"kg"},
+        {id:9,nombre:"Aceite vegetal",     subcategoria:"secos",       categoria:"Otros",          cantidad:4, minimo:3, unidad:"L"}
       ],
       categorias:["Carnes","Verduras","Lacteos","Bebidas","Granos","Otros"],
       unidades:  ["kg","g","L","ml","piezas","cajas","bolsas"]
     },
     b: {
       productos: [
-        {id:1,nombre:"Caldo de pollo",    categoria:"Sopas",          cantidad:20,minimo:10,unidad:"L"},
-        {id:2,nombre:"Salsa roja",         categoria:"Salsas",         cantidad:5, minimo:8, unidad:"L"},
-        {id:3,nombre:"Pan de mesa",        categoria:"Panaderia",      cantidad:0, minimo:12,unidad:"piezas"},
-        {id:4,nombre:"Tortillas maiz",     categoria:"Panaderia",      cantidad:50,minimo:30,unidad:"piezas"},
-        {id:5,nombre:"Agua embotellada",   categoria:"Bebidas",        cantidad:48,minimo:24,unidad:"piezas"}
+        {id:1,nombre:"Caldo de pollo",    subcategoria:"refrigerados",categoria:"Sopas",          cantidad:20,minimo:10,unidad:"L"},
+        {id:2,nombre:"Salsa roja",         subcategoria:"refrigerados",categoria:"Salsas",         cantidad:5, minimo:8, unidad:"L"},
+        {id:3,nombre:"Pan de mesa",        subcategoria:"secos",       categoria:"Panaderia",      cantidad:0, minimo:12,unidad:"piezas"},
+        {id:4,nombre:"Tortillas maiz",     subcategoria:"secos",       categoria:"Panaderia",      cantidad:50,minimo:30,unidad:"piezas"},
+        {id:5,nombre:"Agua embotellada",   subcategoria:"secos",       categoria:"Bebidas",        cantidad:48,minimo:24,unidad:"piezas"}
       ],
       categorias:["Sopas","Salsas","Panaderia","Bebidas","Platos fuertes","Postres"],
       unidades:  ["piezas","L","kg","porciones","cajas","bolsas"]
@@ -139,25 +189,25 @@
   var DEFAULTS_EN = {
     a: {
       productos: [
-        {id:1,nombre:"Chicken breast",    categoria:"Meats",          cantidad:8, minimo:5, unidad:"kg"},
-        {id:2,nombre:"Ground beef",        categoria:"Meats",          cantidad:3, minimo:4, unidad:"kg"},
-        {id:3,nombre:"Tomato",             categoria:"Vegetables",     cantidad:12,minimo:6, unidad:"kg"},
-        {id:4,nombre:"White onion",        categoria:"Vegetables",     cantidad:5, minimo:3, unidad:"kg"},
-        {id:5,nombre:"Manchego cheese",    categoria:"Dairy",          cantidad:2, minimo:3, unidad:"kg"},
-        {id:6,nombre:"Whole milk",         categoria:"Dairy",          cantidad:0, minimo:6, unidad:"L"},
-        {id:7,nombre:"White rice",         categoria:"Grains",         cantidad:15,minimo:10,unidad:"kg"},
-        {id:8,nombre:"Black beans",        categoria:"Grains",         cantidad:7, minimo:5, unidad:"kg"},
-        {id:9,nombre:"Vegetable oil",      categoria:"Other",          cantidad:4, minimo:3, unidad:"L"}
+        {id:1,nombre:"Chicken breast",    subcategoria:"congelados",  categoria:"Meats",          cantidad:8, minimo:5, unidad:"kg"},
+        {id:2,nombre:"Ground beef",        subcategoria:"congelados",  categoria:"Meats",          cantidad:3, minimo:4, unidad:"kg"},
+        {id:3,nombre:"Tomato",             subcategoria:"refrigerados",categoria:"Vegetables",     cantidad:12,minimo:6, unidad:"kg"},
+        {id:4,nombre:"White onion",        subcategoria:"refrigerados",categoria:"Vegetables",     cantidad:5, minimo:3, unidad:"kg"},
+        {id:5,nombre:"Manchego cheese",    subcategoria:"refrigerados",categoria:"Dairy",          cantidad:2, minimo:3, unidad:"kg"},
+        {id:6,nombre:"Whole milk",         subcategoria:"refrigerados",categoria:"Dairy",          cantidad:0, minimo:6, unidad:"L"},
+        {id:7,nombre:"White rice",         subcategoria:"secos",       categoria:"Grains",         cantidad:15,minimo:10,unidad:"kg"},
+        {id:8,nombre:"Black beans",        subcategoria:"secos",       categoria:"Grains",         cantidad:7, minimo:5, unidad:"kg"},
+        {id:9,nombre:"Vegetable oil",      subcategoria:"secos",       categoria:"Other",          cantidad:4, minimo:3, unidad:"L"}
       ],
       categorias:["Meats","Vegetables","Dairy","Beverages","Grains","Other"],
       unidades:  ["kg","g","L","ml","pieces","boxes","bags"]
     },
     b: {
       productos: [
-        {id:1,nombre:"Chicken broth",     categoria:"Soups",          cantidad:20,minimo:10,unidad:"L"},
-        {id:2,nombre:"Red sauce",          categoria:"Sauces",         cantidad:5, minimo:8, unidad:"L"},
-        {id:3,nombre:"Table bread",        categoria:"Bakery",         cantidad:0, minimo:12,unidad:"pieces"},
-        {id:4,nombre:"Corn tortillas",     categoria:"Bakery",         cantidad:50,minimo:30,unidad:"pieces"},
+        {id:1,nombre:"Chicken broth",     subcategoria:"refrigerados",categoria:"Soups",          cantidad:20,minimo:10,unidad:"L"},
+        {id:2,nombre:"Red sauce",          subcategoria:"refrigerados",categoria:"Sauces",         cantidad:5, minimo:8, unidad:"L"},
+        {id:3,nombre:"Table bread",        subcategoria:"secos",       categoria:"Bakery",         cantidad:0, minimo:12,unidad:"pieces"},
+        {id:4,nombre:"Corn tortillas",     subcategoria:"secos",       categoria:"Bakery",         cantidad:50,minimo:30,unidad:"pieces"},
         {id:5,nombre:"Bottled water",      categoria:"Beverages",      cantidad:48,minimo:24,unidad:"pieces"}
       ],
       categorias:["Soups","Sauces","Bakery","Beverages","Main dishes","Desserts"],
@@ -273,10 +323,396 @@
     });
 
     /* Reset category filter if no longer exists */
-    if (filterCat !== "todos" && cs().indexOf(filterCat) < 0) {
-      filterCat = "todos";
+    filterCats = filterCats.filter(function(c){ return cs().indexOf(c) >= 0; });
+  }
+
+  /* ===== AUTH MODULE ===== */
+
+  var auth = firebase.auth();
+
+  /* Helper: username -> email */
+  function toEmail(username) {
+    var u = username.trim().toLowerCase().replace(/\s+/g, "");
+    /* Admin uses their real Gmail */
+    if (u === "admin") { return ADMIN_EMAIL; }
+    return u + "@" + DOMAIN;
+  }
+
+  /* Show/hide login screen */
+  function showLogin() {
+    /* Hide loading overlay first */
+    var lo = document.getElementById("loadingOverlay");
+    if (lo) { lo.classList.add("hidden"); setTimeout(function(){ lo.style.display="none"; }, 400); }
+    var ls = document.getElementById("loginScreen");
+    if (ls) { ls.style.display = ""; }
+    var app = document.querySelector("header");
+    if (app) { app.style.display = "none"; }
+    var nav = document.querySelector(".inv-switcher");
+    if (nav) { nav.style.display = "none"; }
+    var main = document.querySelector("main.container");
+    if (main) { main.style.display = "none"; }
+    var gb = document.getElementById("guestBanner");
+    if (gb) { gb.style.display = "none"; }
+  }
+
+  function hideLogin() {
+    var ls = document.getElementById("loginScreen");
+    if (ls) { ls.style.display = "none"; }
+    var app = document.querySelector("header");
+    if (app) { app.style.display = ""; }
+    var nav = document.querySelector(".inv-switcher");
+    if (nav) { nav.style.display = ""; }
+    var main = document.querySelector("main.container");
+    if (main) { main.style.display = ""; }
+  }
+
+  /* Apply guest/user/admin mode to UI */
+  function applyUserMode() {
+    var body = document.body;
+    body.classList.remove("guest-mode");
+    if (isGuest) {
+      body.classList.add("guest-mode");
+    }
+    /* Header user label */
+    var hu = document.getElementById("headerUser");
+    if (hu) {
+      hu.textContent = isGuest ? "👁 Invitado" : (currentUser ? currentUser.username : "");
+    }
+    /* User menu button */
+    var um = document.getElementById("btnUserMenu");
+    if (um) { um.style.display = ""; }
+    var hun = document.getElementById("headerUserName");
+    if (hun) { hun.textContent = isGuest ? "Invitado" : (currentUser ? currentUser.username : ""); }
+    /* Hide the separate headerUser span — now shown inside button */
+    var hu = document.getElementById("headerUser");
+    if (hu) { hu.style.display = "none"; }
+    /* Historial button — visible to all logged-in users (not guest) */
+    var hb = document.getElementById("btnHistorial");
+    if (hb) { hb.style.display = isGuest ? "none" : ""; }
+    /* Admin panel button in dropdown */
+    var ap = document.getElementById("btnAdminPanel");
+    if (ap) { ap.style.display = currentUser && currentUser.role === "admin" ? "" : "none"; }
+    /* Change password button — hide for guest */
+    var cp = document.getElementById("btnChangePass");
+    if (cp) { cp.style.display = isGuest ? "none" : ""; }
+    /* Dropdown name/role */
+    var dn = document.getElementById("dropdownUserName");
+    var dr = document.getElementById("dropdownUserRole");
+    if (dn) { dn.textContent = isGuest ? "Invitado" : (currentUser ? currentUser.username : ""); }
+    if (dr) { dr.textContent = isGuest ? "Solo lectura" : (currentUser ? currentUser.role : ""); }
+  }
+
+  /* Login with username + password */
+  function doLogin() {
+    var username = document.getElementById("loginUser").value.trim();
+    var password = document.getElementById("loginPass").value;
+    var errEl    = document.getElementById("loginError");
+    var btnLogin = document.getElementById("btnLogin");
+    if (!username) { errEl.textContent = "Ingresa tu usuario"; return; }
+    if (!password) { errEl.textContent = "Ingresa tu contraseña"; return; }
+    errEl.textContent = "";
+    btnLogin.disabled = true;
+    btnLogin.textContent = "Ingresando...";
+    var email = toEmail(username);
+    auth.signInWithEmailAndPassword(email, password)
+      .then(function(cred) {
+        /* Load profile from DB */
+        return loadUserProfile(cred.user.uid, username, email);
+      })
+      .catch(function(err) {
+        btnLogin.disabled = false;
+        btnLogin.textContent = "Ingresar";
+        if (err.code === "auth/wrong-password" || err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+          errEl.textContent = "Usuario o contraseña incorrectos";
+        } else {
+          errEl.textContent = "Error al ingresar. Intenta de nuevo.";
+        }
+      });
+  }
+
+  /* Load or create user profile in DB */
+  function loadUserProfile(uid, username, email) {
+    return db.ref("usuarios/" + uid).once("value").then(function(snap) {
+      var profile = snap.val();
+      if (!profile) {
+        /* First login — create profile */
+        var role = email === ADMIN_EMAIL ? "admin" : "usuario";
+        var uname = email === ADMIN_EMAIL ? "Admin" : username;
+        profile = { username: uname, email: email, role: role, activo: true };
+        db.ref("usuarios/" + uid).set(profile);
+      }
+      currentUser = { uid: uid, username: profile.username, email: profile.email, role: profile.role };
+      isGuest = false;
+      onLoginSuccess();
+    });
+  }
+
+  /* Guest login */
+  function doGuestLogin() {
+    isGuest = true;
+    currentUser = null;
+    onLoginSuccess();
+  }
+
+  /* After successful login */
+  function onLoginSuccess() {
+    hideLogin();
+    applyUserMode();
+    if (!authReady) {
+      authReady = true;
+      listenFirebase();
+    } else {
+      render();
     }
   }
+
+  /* Logout */
+  function doLogout() {
+    closeUserDropdown();
+    if (isGuest) {
+      isGuest = false;
+      currentUser = null;
+      showLogin();
+      return;
+    }
+    auth.signOut().then(function() {
+      currentUser = null;
+      isGuest = false;
+      showLogin();
+    });
+  }
+
+  /* ===== USER DROPDOWN ===== */
+  var dropdownOpen = false;
+  function toggleUserDropdown() {
+    var dd = document.getElementById("userDropdown");
+    dropdownOpen = !dropdownOpen;
+    dd.style.display = dropdownOpen ? "" : "none";
+  }
+  function closeUserDropdown() {
+    var dd = document.getElementById("userDropdown");
+    if (dd) { dd.style.display = "none"; }
+    dropdownOpen = false;
+  }
+  document.addEventListener("click", function(e) {
+    if (!e.target.closest("#userDropdown") && !e.target.closest("#btnUserMenu")) {
+      closeUserDropdown();
+    }
+  });
+
+  /* ===== CHANGE PASSWORD ===== */
+  function openChpass() {
+    closeUserDropdown();
+    document.getElementById("chpassCurrent").value = "";
+    document.getElementById("chpassNew").value = "";
+    document.getElementById("chpassConfirm").value = "";
+    document.getElementById("chpassError").textContent = "";
+    document.getElementById("chpassOverlay").classList.add("open");
+  }
+  function closeChpass() { document.getElementById("chpassOverlay").classList.remove("open"); }
+
+  function saveChpass() {
+    var cur  = document.getElementById("chpassCurrent").value;
+    var nw   = document.getElementById("chpassNew").value;
+    var conf = document.getElementById("chpassConfirm").value;
+    var errEl = document.getElementById("chpassError");
+    if (!cur || !nw || !conf) { errEl.textContent = "Completa todos los campos"; return; }
+    if (nw.length < 6) { errEl.textContent = "La nueva contraseña debe tener al menos 6 caracteres"; return; }
+    if (nw !== conf) { errEl.textContent = "Las contraseñas no coinciden"; return; }
+    errEl.textContent = "";
+    var user = auth.currentUser;
+    /* Re-authenticate first */
+    var cred = firebase.auth.EmailAuthProvider.credential(user.email, cur);
+    user.reauthenticateWithCredential(cred)
+      .then(function() { return user.updatePassword(nw); })
+      .then(function() { closeChpass(); toast("Contraseña actualizada"); })
+      .catch(function(err) {
+        if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+          errEl.textContent = "La contraseña actual es incorrecta";
+        } else {
+          errEl.textContent = "Error al cambiar contraseña";
+        }
+      });
+  }
+
+  /* ===== ADMIN PANEL ===== */
+  function openAdminPanel() {
+    closeUserDropdown();
+    showAdminTab("usuarios");
+    loadAdminUserList();
+    document.getElementById("adminOverlay").classList.add("open");
+  }
+  function closeAdminPanel() { document.getElementById("adminOverlay").classList.remove("open"); }
+
+  function showAdminTab(tab) {
+    document.querySelectorAll(".admin-tab").forEach(function(t) {
+      t.classList.toggle("active", t.dataset.tab === tab);
+    });
+    document.getElementById("adminPanelUsers").style.display = tab === "usuarios" ? "" : "none";
+    document.getElementById("adminPanelNew").style.display   = tab === "nuevo" ? "" : "none";
+    if (tab === "nuevo") {
+      document.getElementById("newUsername").value = "";
+      document.getElementById("newUserPass").value = "";
+      document.getElementById("newUserError").textContent = "";
+    }
+  }
+
+  function loadAdminUserList() {
+    var list = document.getElementById("adminUserList");
+    list.innerHTML = "<div style='text-align:center;padding:1rem;color:var(--muted);font-family:DM Mono,monospace;font-size:0.8rem'>Cargando...</div>";
+    db.ref("usuarios").once("value").then(function(snap) {
+      var users = snap.val() || {};
+      var h = "";
+      /* Add guest entry */
+      h += "<div class='admin-user-item'>";
+      h += "<div class='admin-user-avatar guest'>G</div>";
+      h += "<div class='admin-user-info'><div class='admin-user-name'>Invitado</div><div class='admin-user-email'>Sin contraseña — solo lectura</div></div>";
+      h += "<span class='admin-user-role role-invitado'>Invitado</span>";
+      h += "</div>";
+      Object.keys(users).forEach(function(uid) {
+        var u = users[uid];
+        var initial = (u.username || "?")[0].toUpperCase();
+        var roleClass = u.role === "admin" ? "role-admin" : "role-usuario";
+        h += "<div class='admin-user-item'>";
+        h += "<div class='admin-user-avatar'>" + initial + "</div>";
+        h += "<div class='admin-user-info'>";
+        h += "<div class='admin-user-name'>" + escapeHTML(u.username || "") + "</div>";
+        h += "<div class='admin-user-email'>" + escapeHTML(u.email || "") + "</div>";
+        h += "</div>";
+        h += "<span class='admin-user-role " + roleClass + "'>" + escapeHTML(u.role || "") + "</span>";
+        h += "<div class='admin-user-actions'>";
+        /* Reset password button — not for self */
+        if (uid !== (currentUser && currentUser.uid)) {
+          h += "<button class='admin-action-btn' title='Resetear contraseña' data-uid='" + uid + "' data-action='reset'>🔑</button>";
+        }
+        h += "</div></div>";
+      });
+      list.innerHTML = h || "<div style='text-align:center;padding:1rem;color:var(--muted)'>Sin usuarios</div>";
+      list.querySelectorAll("[data-action='reset']").forEach(function(btn) {
+        btn.addEventListener("click", function() { adminResetPassword(btn.dataset.uid); });
+      });
+    });
+  }
+
+  function adminResetPassword(uid) {
+    db.ref("usuarios/" + uid).once("value").then(function(snap) {
+      var u = snap.val();
+      if (!u) { toast("Usuario no encontrado"); return; }
+      var newPass = prompt("Nueva contraseña para " + u.username + " (mín. 6 caracteres):");
+      if (!newPass || newPass.length < 6) { toast("Contraseña inválida"); return; }
+      /* Use Firebase Admin via REST — requires using the user's current session */
+      /* Since we can't call Admin SDK from client, we store a pending reset in DB */
+      /* The next time that user logs in, we check for a pending reset */
+      db.ref("pendingReset/" + uid).set({ newPass: newPass, by: currentUser.uid, at: Date.now() })
+        .then(function() { toast("Reset guardado — se aplicará en el próximo login de " + u.username); });
+    });
+  }
+
+  function createUser() {
+    var username = document.getElementById("newUsername").value.trim();
+    var role     = document.getElementById("newUserRole").value;
+    var pass     = document.getElementById("newUserPass").value;
+    var errEl    = document.getElementById("newUserError");
+    if (!username) { errEl.textContent = "Ingresa un nombre de usuario"; return; }
+    if (pass.length < 6) { errEl.textContent = "La contraseña debe tener al menos 6 caracteres"; return; }
+    var email = toEmail(username);
+    errEl.textContent = "";
+    document.getElementById("btnCreateUser").disabled = true;
+
+    /* Create in Firebase Auth, then save profile */
+    /* We use a secondary app instance to avoid logging out the current admin */
+    var secondaryApp;
+    try {
+      secondaryApp = firebase.app("secondary");
+    } catch(e) {
+      secondaryApp = firebase.initializeApp(firebase.app().options, "secondary");
+    }
+    var secondaryAuth = secondaryApp.auth();
+    secondaryAuth.createUserWithEmailAndPassword(email, pass)
+      .then(function(cred) {
+        var uid = cred.user.uid;
+        var displayName = username.charAt(0).toUpperCase() + username.slice(1);
+        return db.ref("usuarios/" + uid).set({
+          username: displayName, email: email, role: role, activo: true
+        }).then(function() {
+          return secondaryAuth.signOut();
+        });
+      })
+      .then(function() {
+        document.getElementById("btnCreateUser").disabled = false;
+        toast("Usuario creado: " + username + "@imenjivar.com");
+        showAdminTab("usuarios");
+        loadAdminUserList();
+      })
+      .catch(function(err) {
+        document.getElementById("btnCreateUser").disabled = false;
+        if (err.code === "auth/email-already-in-use") {
+          errEl.textContent = "Ese usuario ya existe";
+        } else {
+          errEl.textContent = "Error: " + err.message;
+        }
+      });
+  }
+
+  /* ===== WIRE AUTH EVENTS ===== */
+  /* Login screen */
+  var loginUserEl  = document.getElementById("loginUser");
+  var loginPassEl  = document.getElementById("loginPass");
+  var btnLoginEl   = document.getElementById("btnLogin");
+  var btnGuestEl   = document.getElementById("btnGuest");
+  var btnShowPass  = document.getElementById("btnShowPass");
+
+  if (btnLoginEl)  { btnLoginEl.addEventListener("click", doLogin); }
+  if (btnGuestEl)  { btnGuestEl.addEventListener("click", doGuestLogin); }
+  if (loginPassEl) { loginPassEl.addEventListener("keydown", function(e){ if(e.key==="Enter"){ doLogin(); } }); }
+  if (loginUserEl) { loginUserEl.addEventListener("keydown", function(e){ if(e.key==="Enter"){ document.getElementById("loginPass").focus(); } }); }
+  if (btnShowPass) {
+    btnShowPass.addEventListener("click", function() {
+      var inp = document.getElementById("loginPass");
+      inp.type = inp.type === "password" ? "text" : "password";
+      btnShowPass.textContent = inp.type === "password" ? "👁" : "🙈";
+    });
+  }
+
+  /* Header user menu */
+  var btnUserMenu = document.getElementById("btnUserMenu");
+  if (btnUserMenu) { btnUserMenu.addEventListener("click", toggleUserDropdown); }
+  var btnLogout = document.getElementById("btnLogout");
+  if (btnLogout) { btnLogout.addEventListener("click", doLogout); }
+  var btnChangePass = document.getElementById("btnChangePass");
+  if (btnChangePass) { btnChangePass.addEventListener("click", openChpass); }
+  var btnAdminPanel = document.getElementById("btnAdminPanel");
+  if (btnAdminPanel) { btnAdminPanel.addEventListener("click", openAdminPanel); }
+
+  /* ===== FIREBASE AUTH STATE OBSERVER ===== */
+  /* Show login screen while waiting */
+  showLogin();
+  auth.onAuthStateChanged(function(user) {
+    if (user) {
+      /* Check for pending password reset */
+      db.ref("pendingReset/" + user.uid).once("value").then(function(snap) {
+        var reset = snap.val();
+        if (reset && reset.newPass) {
+          return user.updatePassword(reset.newPass).then(function() {
+            return db.ref("pendingReset/" + user.uid).remove();
+          });
+        }
+      }).catch(function(){});
+
+      loadUserProfile(user.uid, user.displayName || user.email.split("@")[0], user.email)
+        .catch(function() {
+          /* Profile load failed — still let them in */
+          currentUser = { uid: user.uid, username: user.email.split("@")[0], email: user.email, role: "usuario" };
+          isGuest = false;
+          onLoginSuccess();
+        });
+    } else {
+      /* Not logged in — show login */
+      if (!isGuest) { showLogin(); }
+    }
+  });
+
+  /* ===== END AUTH MODULE ===== */
 
   /* ===== FIREBASE DATABASE REFERENCE ===== */
   if (!window.firebase || !window.firebase.database) {
@@ -284,10 +720,9 @@
     document.getElementById("loadingText").textContent =
       "Error: no se pudo conectar con Firebase. Verifica tu conexion.";
     document.getElementById("loadingText").style.color = "#c0392b";
-    return; /* Stop execution of the IIFE */
+    return;
   }
 
-  var db;
   try {
     db = firebase.database();
   } catch(e) {
@@ -397,7 +832,8 @@
             categorias: catsObj,
             unidades:   unitsObj,
             cattrans:   {},
-            unittrans:  {}
+            unittrans:  {},
+            caticons:   {}
           });
           loaded[inv] = true;
           checkAllLoaded();
@@ -443,13 +879,14 @@
 
         if (data.cattrans)  { catTransCache[inv]  = data.cattrans; }
         if (data.unittrans) { unitTransCache[inv] = data.unittrans; }
+        if (data.caticons)  { catIconsCache[inv]  = data.caticons; }
 
         if (!loaded[inv]) {
           loaded[inv] = true;
           checkAllLoaded();
         } else {
           if (inv === activeInv) {
-            if (filterCat !== "todos" && cs().indexOf(filterCat) < 0) { filterCat = "todos"; }
+            filterCats = filterCats.filter(function(c){ return cs().indexOf(c) >= 0; });
             render();
           }
         }
@@ -466,7 +903,7 @@
     });
   }
 
-  var state = { a: loadState("a"), b: loadState("b") };
+  state = { a: loadState("a"), b: loadState("b") };
   function S()  { return state[activeInv]; }
   function ps() { return S().productos; }
   function cs() { return S().categorias; }
@@ -476,9 +913,6 @@
     var ids = ps().map(function(p){return p.id;});
     return ids.length ? Math.max.apply(null,ids)+1 : 1;
   }
-
-  var filterCat="todos", filterStatus="todos", sortField=null, sortAsc=true;
-  var adjId=null, adjMode="entrada", pendingDel=null;
 
   var PAL = [
     {bg:"#fdecea",color:"#9b2226"},{bg:"#e6f4ec",color:"#1a6e3a"},
@@ -507,7 +941,7 @@
 
   /* ===== SWITCH INVENTORY ===== */
   function switchInventory(inv) {
-    activeInv=inv; filterCat="todos"; filterStatus="todos"; sortField=null;
+    activeInv=inv; filterSubcat="todos"; filterCats=[]; filterStatus="todos"; sortField=null;
     localStorage.setItem("inv_active",inv);
     document.getElementById("tabA").className = "inv-tab" + (inv==="a"?" active-a":"");
     document.getElementById("tabB").className = "inv-tab" + (inv==="b"?" active-b":"");
@@ -527,6 +961,7 @@
       thMinimo:"thMin", thDiff:"thDiff", thUnidad:"thUnit", thEstado:"thStatus",
       hBtnAdd:"btnAdd", hBtnCat:"btnCat", hBtnUnit:"btnUnit",
       lNombreES:"lNombreES", lNombreEN:"lNombreEN",
+      lSubcat:"lSubcat",
       lCategoria:"lCat", lUnidad:"lUnit",
       lCantidad:"lCantidad", lMinimo:"lMin",
       btnModalCancel:"cancel", btnModalSave:"save",
@@ -603,18 +1038,89 @@
   }
   window.setStatusFilter = setStatusFilter;
 
-  /* ===== FILTER BUTTONS ===== */
+  /* ===== FILTER BUTTONS — 2 levels ===== */
   function renderFilterBtns() {
-    var wrap = document.getElementById("filterBtns");
-    var h = "<button class=\"filter-btn"+(filterCat==="todos"?" active":"")+"\" data-cat=\"todos\">"+tr("allFilter")+"</button>";
-    cs().forEach(function(c) {
-      h += "<button class=\"filter-btn"+(filterCat===c?" active":"")+"\" data-cat=\""+c+"\">"+c+"</button>";
+    renderSubcatTabs();
+    renderCatFilterBtns();
+  }
+
+  /* Level 2: subcategory tabs */
+  function renderSubcatTabs() {
+    var wrap = document.getElementById("subcatTabs");
+    if (!wrap) { return; }
+    var prods = ps();
+
+    /* Count per subcat */
+    var counts = {};
+    SUBCATS.forEach(function(s) { counts[s.id] = 0; });
+    prods.forEach(function(p) { if (p.subcategoria && counts[p.subcategoria] !== undefined) { counts[p.subcategoria]++; } });
+
+    var h = "<button class=\"subcat-all-btn" + (filterSubcat === "todos" ? " active" : "") + "\" id=\"subcatAll\">" + tr("allSubcats") + "</button>";
+    SUBCATS.forEach(function(s) {
+      var isActive = filterSubcat === s.id;
+      var cnt = counts[s.id];
+      h += "<button class=\"subcat-tab" + (isActive ? " active" : "") + "\" data-subcat=\"" + s.id + "\">";
+      h += "<span class=\"subcat-tab-icon\">" + s.iconES + "</span>";
+      h += (lang === "es" ? s.labelES : s.labelEN);
+      h += "<span class=\"subcat-tab-count\">" + cnt + "</span>";
+      h += "</button>";
     });
     wrap.innerHTML = h;
+
+    document.getElementById("subcatAll").addEventListener("click", function() {
+      filterSubcat = "todos"; filterCats = []; renderFilterBtns(); render();
+    });
+    wrap.querySelectorAll(".subcat-tab").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var id = btn.dataset.subcat;
+        filterSubcat = (filterSubcat === id) ? "todos" : id;
+        filterCats = []; /* reset cat filter when subcat changes */
+        renderFilterBtns(); render();
+      });
+    });
+  }
+
+  /* Level 3: category multi-select filter */
+  function renderCatFilterBtns() {
+    var wrap = document.getElementById("filterBtns");
+    if (!wrap) { return; }
+
+    /* Get categories available in the active subcat */
+    var prods = ps();
+    var visibleProds = filterSubcat === "todos"
+      ? prods
+      : prods.filter(function(p) { return p.subcategoria === filterSubcat; });
+
+    var catsInView = [];
+    visibleProds.forEach(function(p) {
+      if (p.categoria && catsInView.indexOf(p.categoria) < 0) { catsInView.push(p.categoria); }
+    });
+    /* Keep original order from cs() */
+    catsInView = cs().filter(function(c) { return catsInView.indexOf(c) >= 0; });
+
+    /* Clean up filterCats — remove any that don't exist in this view */
+    filterCats = filterCats.filter(function(c) { return catsInView.indexOf(c) >= 0; });
+
+    if (!catsInView.length) { wrap.innerHTML = ""; return; }
+
+    var h = "";
+    catsInView.forEach(function(c) {
+      var isActive = filterCats.indexOf(c) >= 0;
+      var icon = catIcon(c);
+      h += "<button class=\"filter-btn" + (isActive ? " active" : "") + "\" data-cat=\"" + escapeHTML(c) + "\">" + (icon ? icon + " " : "") + escapeHTML(c) + "</button>";
+    });
+    wrap.innerHTML = h;
+
     wrap.querySelectorAll(".filter-btn").forEach(function(btn) {
       btn.addEventListener("click", function() {
-        filterCat=btn.dataset.cat; filterStatus="todos";
-        renderFilterBtns(); render();
+        var cat = btn.dataset.cat;
+        var idx = filterCats.indexOf(cat);
+        if (idx >= 0) {
+          filterCats.splice(idx, 1); /* deselect */
+        } else {
+          filterCats.push(cat); /* add to selection */
+        }
+        renderCatFilterBtns(); render();
       });
     });
   }
@@ -632,10 +1138,12 @@
   function getList() {
     var q = document.getElementById("searchInput").value.toLowerCase();
     var list = ps().filter(function(p) {
-      var st=stockStatus(p);
-      return (filterCat==="todos"||p.categoria===filterCat) &&
-             (filterStatus==="todos"||st===filterStatus) &&
-             p.nombre.toLowerCase().indexOf(q)>=0;
+      var st = stockStatus(p);
+      var matchSubcat = filterSubcat === "todos" || p.subcategoria === filterSubcat;
+      var matchCat    = filterCats.length === 0 || filterCats.indexOf(p.categoria) >= 0;
+      var matchStatus = filterStatus === "todos" || st === filterStatus;
+      var matchSearch = p.nombre.toLowerCase().indexOf(q) >= 0;
+      return matchSubcat && matchCat && matchStatus && matchSearch;
     });
     if (sortField) {
       list = list.slice().sort(function(a,b) {
@@ -662,7 +1170,12 @@
       h+="<tr class=\"draggable-row\">";
       h+="<td class=\"drag-handle\" title=\""+(lang==="es"?"Arrastrar para reordenar":"Drag to reorder")+"\">&#8597;</td>";
       h+="<td><strong>"+escapeHTML(p.nombre)+"</strong></td>";
-      h+="<td><span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(p.categoria)+"</span></td>";
+      h+="<td><div class=\"cat-cell\">";
+      if (p.subcategoria) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(subcatLabel(p.subcategoria))+"\">"+subcatIcon(p.subcategoria)+"</span>"; }
+      var cIcon = catIcon(p.categoria);
+      if (cIcon) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(p.categoria)+"\">"+cIcon+"</span>"; }
+      else { h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(p.categoria)+"</span>"; }
+      h+="</div></td>";
       h+="<td><div class=\"stock-cell\">";
       h+="<div class=\"bar-bg\"><div class=\"bar-fill\" style=\"width:"+pct+"%;background:"+barClr(st)+"\"></div></div>";
       h+="<span class=\"stock-num "+st+"-color\">"+escapeHTML(p.cantidad)+"</span>";
@@ -697,7 +1210,12 @@
       h+="<div class=\"card-header\">";
       h+="<div>";
       h+="<div class=\"card-name\">"+escapeHTML(p.nombre)+"</div>";
-      h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+";margin-top:0.3rem\">"+escapeHTML(p.categoria)+"</span>";
+      h+="<div class=\"cat-cell\" style=\"margin-top:0.3rem\">";
+      if (p.subcategoria) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(subcatLabel(p.subcategoria))+"\">"+subcatIcon(p.subcategoria)+"</span>"; }
+      var cIcon = catIcon(p.categoria);
+      if (cIcon) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(p.categoria)+"\">"+cIcon+"</span>"; }
+      else { h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(p.categoria)+"</span>"; }
+      h+="</div>";
       h+="</div>";
       h+="<div style=\"display:flex;align-items:center;gap:0.5rem;\">";
       h+=statusEl(st);
@@ -774,6 +1292,17 @@
     document.getElementById("fNombreEN").value   = p ? (p.nombreEN || (lang==="en"?p.nombre:"")) : "";
     document.getElementById("fNombreES").placeholder = "Ej: Pechuga de pollo";
     document.getElementById("fNombreEN").placeholder = "E.g.: Chicken breast";
+    /* Render subcat selector */
+    var subcatSel = document.getElementById("fSubcat");
+    if (subcatSel) {
+      var sh = "";
+      SUBCATS.forEach(function(s) {
+        var label = lang === "es" ? s.labelES : s.labelEN;
+        var sel   = (p && p.subcategoria === s.id) ? " selected" : "";
+        sh += "<option value=\"" + s.id + "\"" + sel + ">" + s.iconES + " " + label + "</option>";
+      });
+      subcatSel.innerHTML = sh;
+    }
     renderCatSelect(p?p.categoria:cs()[0]);
     renderUnitSelect(p?p.unidad:us()[0]);
     document.getElementById("fCantidad").value   = p ? p.cantidad : "";
@@ -789,40 +1318,47 @@
   function guardarProducto() {
     var nombreES  = document.getElementById("fNombreES").value.trim();
     var nombreEN  = document.getElementById("fNombreEN").value.trim();
+    var subcatEl  = document.getElementById("fSubcat");
+    var subcategoria = subcatEl ? subcatEl.value : "secos";
     var categoria = document.getElementById("fCategoria").value;
     var unidad    = document.getElementById("fUnidad").value;
     var cantidad  = parseFloat(document.getElementById("fCantidad").value);
     var minimo    = parseFloat(document.getElementById("fMinimo").value);
 
-    /* At least the current language name is required */
     var nombreActual = lang==="es" ? nombreES : nombreEN;
     if (!nombreActual || isNaN(cantidad) || isNaN(minimo)) { toast(tr("toastFields")); return; }
 
-    /* If only one language was filled, use it for both as fallback */
     if (!nombreES) { nombreES = nombreEN; }
     if (!nombreEN) { nombreEN = nombreES; }
-
-    /* The displayed name is always the one matching current language */
     var nombre = lang==="es" ? nombreES : nombreEN;
 
     var id = document.getElementById("editId").value;
     if (id) {
       var idx = S().productos.findIndex(function(p){return p.id==id;});
+      var anterior = S().productos[idx];
       S().productos[idx] = {
         id:parseInt(id,10), nombre:nombre,
         nombreES:nombreES, nombreEN:nombreEN,
+        subcategoria:subcategoria,
         categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo
       };
+      logAudit("✏️ Editado", nombre +
+        (anterior.cantidad !== cantidad ? " | Stock: " + anterior.cantidad + " → " + cantidad + " " + unidad : "") +
+        (anterior.categoria !== categoria ? " | Categoría: " + anterior.categoria + " → " + categoria : "") +
+        (anterior.subcategoria !== subcategoria ? " | Almacén: " + subcatLabel(anterior.subcategoria) + " → " + subcatLabel(subcategoria) : "")
+      );
       toast(tr("toastUpdated"));
     } else {
       S().productos.push({
         id:nextId(), nombre:nombre,
         nombreES:nombreES, nombreEN:nombreEN,
+        subcategoria:subcategoria,
         categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo
       });
+      logAudit("➕ Agregado", nombre + " | " + subcatLabel(subcategoria) + " / " + categoria + " | Stock inicial: " + cantidad + " " + unidad);
       toast(tr("toastAdded"));
     }
-    save(); closeModal(); render();
+    save(); closeModal(); renderFilterBtns(); render();
   }
   function editarProducto(id) { openModal(ps().find(function(x){return x.id===id;})); }
   window.openModal=openModal; window.closeModal=closeModal;
@@ -839,6 +1375,7 @@
   function confirmarEliminar() {
     if (pendingDel===null) { return; }
     var p=ps().find(function(x){return x.id===pendingDel;});
+    logAudit("🗑️ Eliminado", p.nombre + " | " + (p.categoria||"") + " | Stock al eliminar: " + p.cantidad + " " + p.unidad);
     S().productos=S().productos.filter(function(x){return x.id!==pendingDel;});
     save(); render(); closeDelModal();
     toast('"'+escapeHTML(p.nombre)+'" '+tr("toastDeleted"));
@@ -885,12 +1422,15 @@
     var p=ps().find(function(x){return x.id===adjId;});
     var qty=parseFloat(document.getElementById("adjQty").value);
     if (isNaN(qty)) { toast(tr("toastInvalid")); return; }
+    var anterior = p.cantidad;
     var nuevo;
     if (adjMode==="entrada") { nuevo=p.cantidad+qty; }
     else if (adjMode==="salida") { nuevo=p.cantidad-qty; }
     else { nuevo=qty; }
     if (nuevo<0) { toast(tr("toastNegStock")); return; }
     p.cantidad=Math.round(nuevo*100)/100;
+    var tipoAdj = adjMode==="entrada" ? "📦 Entrada" : adjMode==="salida" ? "📤 Salida" : "🔧 Ajuste directo";
+    logAudit(tipoAdj, p.nombre + " | " + anterior + " → " + p.cantidad + " " + p.unidad);
     save(); render(); closeAdj();
     toast('"'+escapeHTML(p.nombre)+'": '+escapeHTML(p.cantidad)+" "+escapeHTML(p.unidad));
   }
@@ -925,7 +1465,19 @@
   var tempCatTrans = {}; /* { nameES: nameEN } for new entries being built */
 
   var catTransCache  = { a: {}, b: {} };
+  var catIconsCache  = { a: {}, b: {} }; /* { "Carnes": "🥩", "Verduras": "🥦" } */
   function loadCatTrans(inv)  { return catTransCache[inv]  || {}; }
+  function loadCatIcons(inv)  { return catIconsCache[inv]  || {}; }
+  function catIcon(cat) {
+    var icons = loadCatIcons(activeInv);
+    return icons[cat] || "";
+  }
+  function saveCatIconsFB(inv, map) {
+    if (!db) { return; }
+    db.ref("inventario/" + inv + "/caticons").set(map).catch(function(e) {
+      console.error("[Inventario] Error guardando iconos de categorias:", e);
+    });
+  }
 
   /* On language switch, apply user-category translations */
   function translateUserCats() {
@@ -951,13 +1503,20 @@
 
       saveState(inv);
     });
-    if (filterCat !== "todos" && cs().indexOf(filterCat) < 0) { filterCat = "todos"; }
+    filterCats = filterCats.filter(function(c){ return cs().indexOf(c) >= 0; });
   }
 
+  var tempCats     = [];
+  var tempCatTrans = {};
+  var tempCatIcons = {};
+
   function openCatMgr() {
-    tempCats = cs().slice();
+    tempCats     = cs().slice();
     tempCatTrans = loadCatTrans(activeInv);
+    tempCatIcons = Object.assign({}, loadCatIcons(activeInv));
     renderCatMgrList();
+    var iconEl = document.getElementById("catNewIcon");
+    if (iconEl) { iconEl.value = ""; }
     document.getElementById("catNewNameES").value = "";
     document.getElementById("catNewNameEN").value = "";
     document.getElementById("catMgrOverlay").classList.add("open");
@@ -976,7 +1535,6 @@
       list.innerHTML = "<div style=\"text-align:center;color:var(--muted);padding:1rem 0\">" + tr("noCats") + "</div>";
       return;
     }
-    /* Build reverse map to show both names */
     var trans   = tempCatTrans;
     var reverse = {};
     Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
@@ -985,14 +1543,13 @@
     for (var i = 0; i < tempCats.length; i++) {
       var p    = PAL[i % PAL.length];
       var c    = tempCats[i];
-      /* Figure out the other-language name for display */
-      var nameES = lang === "es" ? c : (reverse[c] || c);
-      var nameEN = lang === "en" ? c : (trans[c]   || c);
+      var icon = tempCatIcons[c] || "";
       var otherLabel = lang === "es"
         ? (trans[c]   ? " / " + trans[c]   : "")
         : (reverse[c] ? " / " + reverse[c] : "");
 
       h += "<div class=\"mgr-item\">";
+      h += "<input class=\"mgr-icon-input\" type=\"text\" value=\"" + escapeHTML(icon) + "\" data-iconidx=\"" + i + "\" placeholder=\"🏷️\" maxlength=\"4\" title=\"Emoji\">";
       h += "<div class=\"mgr-dot\" style=\"background:" + p.color + "\"></div>";
       h += "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(c) + "\" data-idx=\"" + i + "\">";
       h += "<span class=\"mgr-other-lang\">" + escapeHTML(otherLabel) + "</span>";
@@ -1000,6 +1557,16 @@
       h += "</div>";
     }
     list.innerHTML = h;
+
+    list.querySelectorAll(".mgr-icon-input").forEach(function(inp) {
+      inp.addEventListener("change", function() {
+        var idx  = parseInt(inp.dataset.iconidx, 10);
+        var cat  = tempCats[idx];
+        var icon = inp.value.trim();
+        if (icon) { tempCatIcons[cat] = icon; }
+        else { delete tempCatIcons[cat]; }
+      });
+    });
     list.querySelectorAll(".mgr-input").forEach(function(inp) {
       inp.addEventListener("change", function() {
         var idx = parseInt(inp.dataset.idx, 10);
@@ -1038,27 +1605,27 @@
   }
 
   function agregarCategoria() {
-    var nameES = document.getElementById("catNewNameES").value.trim();
-    var nameEN = document.getElementById("catNewNameEN").value.trim();
-    /* At least the active language name is required */
+    var iconEl   = document.getElementById("catNewIcon");
+    var icon     = iconEl ? iconEl.value.trim() : "";
+    var nameES   = document.getElementById("catNewNameES").value.trim();
+    var nameEN   = document.getElementById("catNewNameEN").value.trim();
     var nameActive = lang === "es" ? nameES : nameEN;
     if (!nameActive) {
       document.getElementById(lang === "es" ? "catNewNameES" : "catNewNameEN").focus();
       return;
     }
-    /* Use the other as fallback if not filled */
     if (!nameES) { nameES = nameEN; }
     if (!nameEN) { nameEN = nameES; }
 
-    /* Check for duplicates */
     var exists = tempCats.some(function(c) { return c.toLowerCase() === nameActive.toLowerCase(); });
     if (exists) { toast(tr("toastCatExists")); return; }
 
-    /* Store the active-language name in the list and save translation */
     tempCats.push(nameActive);
+    if (icon) { tempCatIcons[nameActive] = icon; }
     if (nameES !== nameEN) {
-      tempCatTrans[nameES] = nameEN; /* always store as ES->EN */
+      tempCatTrans[nameES] = nameEN;
     }
+    if (iconEl) { iconEl.value = ""; }
     document.getElementById("catNewNameES").value = "";
     document.getElementById("catNewNameEN").value = "";
     renderCatMgrList();
@@ -1066,10 +1633,20 @@
   }
 
   function guardarCategorias() {
+    /* Capture any inline edits to name and icon fields */
     document.querySelectorAll("#catManagerList .mgr-input").forEach(function(inp) {
       var i = parseInt(inp.dataset.idx, 10);
       var v = inp.value.trim();
       if (v) { tempCats[i] = v; }
+    });
+    document.querySelectorAll("#catManagerList .mgr-icon-input").forEach(function(inp) {
+      var i    = parseInt(inp.dataset.iconidx, 10);
+      var cat  = tempCats[i];
+      var icon = inp.value.trim();
+      if (cat) {
+        if (icon) { tempCatIcons[cat] = icon; }
+        else { delete tempCatIcons[cat]; }
+      }
     });
     var seen = {};
     tempCats = tempCats.filter(function(c) {
@@ -1087,9 +1664,11 @@
     });
     S().categorias = tempCats;
     catTransCache[activeInv] = tempCatTrans;
+    catIconsCache[activeInv] = tempCatIcons;
     saveCatTransFB(activeInv, tempCatTrans);
+    saveCatIconsFB(activeInv, tempCatIcons);
     save();
-    if (filterCat !== "todos" && S().categorias.indexOf(filterCat) < 0) { filterCat = "todos"; }
+    filterCats = filterCats.filter(function(c){ return S().categorias.indexOf(c) >= 0; });
     renderFilterBtns(); render(); closeCatMgr(); toast(tr("toastCatUpdated"));
   }
   window.openCatMgr = openCatMgr; window.closeCatMgr = closeCatMgr;
@@ -1529,9 +2108,145 @@
   document.getElementById("thCantidad").addEventListener("click",  function(){ sortBy("cantidad"); });
   document.getElementById("thMinimo").addEventListener("click",    function(){ sortBy("minimo"); });
 
+  /* ===== HISTORIAL DE AUDITORÍA ===== */
+  var historialOpen = false;
+  var historialFilter = "todos";
+
+  function openHistorial() {
+    historialOpen = true;
+    document.getElementById("historialPanel").classList.add("open");
+    document.getElementById("historialBackdrop").style.display = "";
+    loadHistorial();
+  }
+  function closeHistorial() {
+    historialOpen = false;
+    document.getElementById("historialPanel").classList.remove("open");
+    document.getElementById("historialBackdrop").style.display = "none";
+  }
+
+  function loadHistorial() {
+    var list = document.getElementById("historialList");
+    list.innerHTML = "<div class='hist-loading'>Cargando...</div>";
+    db.ref("historial").orderByChild("ts").limitToLast(200).once("value").then(function(snap) {
+      var entries = [];
+      snap.forEach(function(child) { entries.push(child.val()); });
+      entries.reverse();
+      renderHistorialList(entries);
+    }).catch(function() {
+      list.innerHTML = "<div class='hist-empty'>Error al cargar el historial</div>";
+    });
+  }
+
+  function renderHistorialList(entries) {
+    var list = document.getElementById("historialList");
+    var isAdmin = currentUser && currentUser.role === "admin";
+    var filtered = entries.filter(function(e) {
+      if (historialFilter === "todos")   { return true; }
+      if (historialFilter === "stock")   { return e.accion && (e.accion.indexOf("Entrada") >= 0 || e.accion.indexOf("Salida") >= 0 || e.accion.indexOf("Ajuste") >= 0); }
+      if (historialFilter === "edicion") { return e.accion && (e.accion.indexOf("Editado") >= 0 || e.accion.indexOf("Agregado") >= 0 || e.accion.indexOf("Eliminado") >= 0); }
+      return true;
+    });
+    if (!isAdmin) {
+      var cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      filtered = filtered.filter(function(e) { return e.ts >= cutoff; });
+    }
+    if (!filtered.length) {
+      list.innerHTML = "<div class='hist-empty'>Sin registros</div>";
+      return;
+    }
+    var h = "";
+    var lastDate = "";
+    filtered.forEach(function(e) {
+      var d = new Date(e.ts);
+      var loc = lang === "es" ? "es-MX" : "en-US";
+      var dateStr = d.toLocaleDateString(loc, { weekday:"long", day:"numeric", month:"long" });
+      var timeStr = d.toLocaleTimeString(loc, { hour:"2-digit", minute:"2-digit" });
+      if (dateStr !== lastDate) {
+        h += "<div class='hist-date-sep'>" + escapeHTML(dateStr) + "</div>";
+        lastDate = dateStr;
+      }
+      var accionClass = "hist-accion-default";
+      if (e.accion) {
+        if (e.accion.indexOf("Entrada") >= 0)  { accionClass = "hist-accion-entrada"; }
+        else if (e.accion.indexOf("Salida") >= 0)   { accionClass = "hist-accion-salida"; }
+        else if (e.accion.indexOf("Eliminado") >= 0) { accionClass = "hist-accion-del"; }
+        else if (e.accion.indexOf("Agregado") >= 0)  { accionClass = "hist-accion-add"; }
+        else if (e.accion.indexOf("Ajuste") >= 0)    { accionClass = "hist-accion-adj"; }
+      }
+      h += "<div class='hist-entry'>";
+      h += "<div class='hist-entry-left'>";
+      h += "<span class='hist-accion " + accionClass + "'>" + escapeHTML(e.accion || "") + "</span>";
+      h += "<span class='hist-detalles'>" + escapeHTML(e.detalles || "") + "</span>";
+      h += "<span class='hist-inv-badge'>" + escapeHTML(e.inv || "") + "</span>";
+      h += "</div>";
+      h += "<div class='hist-entry-right'>";
+      h += "<span class='hist-usuario'>" + escapeHTML(e.usuario || "") + "</span>";
+      h += "<span class='hist-time'>" + escapeHTML(timeStr) + "</span>";
+      h += "</div></div>";
+    });
+    if (isAdmin) {
+      h += "<div class='hist-export-row'><button class='hist-export-btn' id='btnExportHistorial'>⬇ Exportar CSV</button></div>";
+    }
+    list.innerHTML = h;
+    if (isAdmin) {
+      var eb = document.getElementById("btnExportHistorial");
+      if (eb) { eb.addEventListener("click", function() { exportHistorialCSV(entries); }); }
+    }
+  }
+
+  function exportHistorialCSV(entries) {
+    var rows = ["Fecha,Hora,Usuario,Inventario,Accion,Detalles"];
+    entries.forEach(function(e) {
+      var d = new Date(e.ts);
+      var loc = lang === "es" ? "es-MX" : "en-US";
+      var row = [
+        d.toLocaleDateString(loc),
+        d.toLocaleTimeString(loc, { hour:"2-digit", minute:"2-digit" }),
+        e.usuario||"", e.inv||"", e.accion||"", e.detalles||""
+      ].map(function(v) { return '"' + String(v).replace(/"/g,'""') + '"'; }).join(",");
+      rows.push(row);
+    });
+    var blob = new Blob([rows.join("\n")], { type:"text/csv;charset=utf-8;" });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement("a"); a.href=url;
+    a.download = "historial_afghankabob_" + new Date().toISOString().slice(0,10) + ".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+  }
+
+  var btnHistorial = document.getElementById("btnHistorial");
+  if (btnHistorial) { btnHistorial.addEventListener("click", openHistorial); }
+
+  /* Use document-level delegation for all modal close buttons and historial filters */
+  document.addEventListener("click", function(e) {
+    if (e.target.closest("#btnCloseHistorial")) { closeHistorial(); }
+    if (e.target.id === "historialBackdrop")    { closeHistorial(); }
+    if (e.target.closest("#btnCloseAdmin"))     { closeAdminPanel(); }
+    if (e.target.closest("#btnCloseChpass"))    { closeChpass(); }
+    if (e.target.closest("#btnChpassCancel"))   { closeChpass(); }
+    if (e.target.closest("#btnChpassSave"))     { saveChpass(); }
+    if (e.target.closest("#btnNewUserCancel"))  { showAdminTab("usuarios"); }
+    if (e.target.closest("#btnCreateUser"))     { createUser(); }
+    if (e.target.id === "adminOverlay")         { closeAdminPanel(); }
+    if (e.target.id === "chpassOverlay")        { closeChpass(); }
+
+    /* Historial filter buttons */
+    var filterBtn = e.target.closest(".hist-filter-btn");
+    if (filterBtn) {
+      historialFilter = filterBtn.dataset.filter;
+      document.querySelectorAll(".hist-filter-btn").forEach(function(b) {
+        b.classList.toggle("active", b.dataset.filter === historialFilter);
+      });
+      loadHistorial();
+    }
+
+    /* Admin tabs */
+    var adminTab = e.target.closest(".admin-tab");
+    if (adminTab && adminTab.dataset.tab) { showAdminTab(adminTab.dataset.tab); }
+  });
+
   applyLang();
 
-  /* Connect to Firebase — loads shared data and listens for real-time updates */
-  listenFirebase();
+  /* Auth module calls listenFirebase() after successful login */
 
 })();

@@ -22,17 +22,17 @@
   <script>
     (function() {
       var LIGHT = {
-        "--bg":         "#eef2ee",
-        "--surface":    "#f7faf7",
-        "--surface2":   "#eff4ef",
-        "--border":     "#c8d8c8",
-        "--gold":       "#b8922a",
-        "--gold-light": "#d4a93a",
-        "--red":        "#c0392b",
-        "--green":      "#27845a",
-        "--yellow":     "#c07a10",
-        "--text":       "#1a231a",
-        "--muted":      "#5a6e5a"
+        "--bg":         "#eaefe9",
+        "--surface":    "#f6faf6",
+        "--surface2":   "#edf3ed",
+        "--border":     "#c4d4c4",
+        "--gold":       "#a8821e",
+        "--gold-light": "#c4993a",
+        "--red":        "#b83228",
+        "--green":      "#24784f",
+        "--yellow":     "#b07010",
+        "--text":       "#141f14",
+        "--muted":      "#526252"
       };
 
       function applyLight() {
@@ -47,11 +47,11 @@
         });
 
         /* 3. Forzar fondo y color de texto en html y body */
-        root.style.backgroundColor = "#eef2ee";
-        root.style.color           = "#1a231a";
+        root.style.backgroundColor = "#eaefe9";
+        root.style.color           = "#141f14";
         if (document.body) {
-          document.body.style.backgroundColor = "#eef2ee";
-          document.body.style.color           = "#1a231a";
+          document.body.style.backgroundColor = "#eaefe9";
+          document.body.style.color           = "#141f14";
         }
       }
 
@@ -82,16 +82,31 @@
 <header role="banner">
   <div class="logo">
     <span class="logo-title">Afghan Kabob &amp; Grill</span>
+    <span class="logo-divider" aria-hidden="true"></span>
     <span class="logo-sub" id="hLogoSub" aria-label="Modulo">Inventario</span>
   </div>
   <div class="header-right">
     <span class="header-date" id="headerDate" aria-live="polite"></span>
+    <span class="header-user" id="headerUser" aria-live="polite"></span>
+    <button type="button" class="btn-sm" id="btnHistorial" aria-label="Historial de cambios" style="display:none">🕐</button>
+    <button type="button" class="btn-sm btn-user-menu" id="btnUserMenu" aria-label="Menu de usuario" style="display:none">👤 <span id="headerUserName"></span></button>
     <button type="button" class="btn-sm" id="btnLang" aria-label="Cambiar idioma">EN</button>
     <button type="button" class="btn-sm" id="btnPrint" aria-label="Imprimir o descargar PDF">Imprimir / PDF</button>
   </div>
 </header>
 
-<!-- SELECTOR DE INVENTARIO -->
+<!-- USER DROPDOWN MENU -->
+<div id="userDropdown" class="user-dropdown" style="display:none" role="menu">
+  <div class="user-dropdown-name" id="dropdownUserName"></div>
+  <div class="user-dropdown-role" id="dropdownUserRole"></div>
+  <div class="user-dropdown-divider"></div>
+  <button type="button" class="user-dropdown-item" id="btnChangePass">🔑 Cambiar contraseña</button>
+  <button type="button" class="user-dropdown-item" id="btnAdminPanel" style="display:none">⚙️ Panel de Admin</button>
+  <div class="user-dropdown-divider"></div>
+  <button type="button" class="user-dropdown-item danger" id="btnLogout">↩ Cerrar sesión</button>
+</div>
+<!-- BANNER INVITADO -->
+<div class="guest-banner" id="guestBanner">👁 Modo Invitado — solo lectura</div>
 <nav class="inv-switcher" aria-label="Selector de inventario">
   <button type="button" class="inv-tab active-a" id="tabA" aria-pressed="true">
     <span class="inv-tab-label" id="tabALabel">Inventario</span>
@@ -133,14 +148,19 @@
         + <span id="hBtnAdd">Agregar</span>
       </button>
     </div>
-    <div class="filter-scroll" role="group" aria-label="Filtros por categoria">
-      <div id="filterBtns" class="filter-btns-wrap"></div>
-      <button type="button" class="btn-mgr" id="btnCatMgr" aria-label="Gestionar categorias">
-        &#9881; <span id="hBtnCat">Categorias</span>
-      </button>
-      <button type="button" class="btn-mgr" id="btnUnitMgr" aria-label="Gestionar unidades">
-        &#9881; <span id="hBtnUnit">Unidades</span>
-      </button>
+    <div class="filter-area" role="group" aria-label="Filtros de inventario">
+      <!-- Nivel 2: Subcategorías fijas -->
+      <div class="subcat-tabs" id="subcatTabs" role="group" aria-label="Filtrar por almacenamiento"></div>
+      <!-- Nivel 3: Categorías de producto con filtro múltiple -->
+      <div class="cat-filter-row" id="catFilterRow">
+        <div id="filterBtns" class="filter-btns-wrap"></div>
+        <button type="button" class="btn-mgr" id="btnCatMgr" aria-label="Gestionar categorias">
+          &#9881; <span id="hBtnCat">Categorias</span>
+        </button>
+        <button type="button" class="btn-mgr" id="btnUnitMgr" aria-label="Gestionar unidades">
+          &#9881; <span id="hBtnUnit">Unidades</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -185,6 +205,10 @@
         <label for="fNombreEN" id="lNombreEN">&#127468;&#127463; Name in English</label>
         <input type="text" id="fNombreEN" autocomplete="off" aria-labelledby="lNombreEN">
       </div>
+    </div>
+    <div class="form-group">
+      <label for="fSubcat" id="lSubcat">Almacenamiento</label>
+      <select id="fSubcat" aria-labelledby="lSubcat"></select>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -265,6 +289,8 @@
     <div class="mgr-divider" role="separator"></div>
     <div class="mgr-section-label" id="catMgrAdd">Agregar categoria</div>
     <div class="mgr-add-row">
+      <input type="text" class="mgr-add-input mgr-add-icon" id="catNewIcon" autocomplete="off"
+             placeholder="🏷️" aria-label="Icono emoji" maxlength="4" style="max-width:56px;text-align:center;font-size:1.2rem">
       <input type="text" class="mgr-add-input" id="catNewNameES" autocomplete="off"
              placeholder="&#127466;&#127480; Espanol" aria-label="Nombre en espanol">
       <input type="text" class="mgr-add-input" id="catNewNameEN" autocomplete="off"
@@ -354,9 +380,103 @@
   </div>
 </div>
 
+<!-- PANTALLA DE LOGIN -->
+<div id="loginScreen" style="display:none">
+  <div class="login-bg">
+    <div class="login-card">
+      <div class="login-logo">Afghan Kabob &amp; Grill</div>
+      <div class="login-subtitle">Inventario</div>
+      <div class="login-form">
+        <div class="form-group">
+          <label for="loginUser">Usuario</label>
+          <input type="text" id="loginUser" autocomplete="username" placeholder="Ej: Admin">
+        </div>
+        <div class="form-group" id="loginPassGroup">
+          <label for="loginPass">Contraseña</label>
+          <div class="login-pass-wrap">
+            <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••">
+            <button type="button" class="btn-show-pass" id="btnShowPass" aria-label="Mostrar contraseña">👁</button>
+          </div>
+        </div>
+        <div class="login-error" id="loginError"></div>
+        <button type="button" class="btn-login" id="btnLogin">Ingresar</button>
+        <div class="login-divider"><span>o</span></div>
+        <button type="button" class="btn-guest" id="btnGuest">👁 Entrar como Invitado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Panel de Administracion -->
+<div class="modal-overlay" id="adminOverlay" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
+  <div class="modal modal-md">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <button type="button" class="modal-close" id="btnCloseAdmin" aria-label="Cerrar">&#10005;</button>
+    <div class="modal-title" id="adminTitle">Panel de Administracion</div>
+    <div class="admin-tabs">
+      <button type="button" class="admin-tab active" data-tab="usuarios">Usuarios</button>
+      <button type="button" class="admin-tab" data-tab="nuevo">+ Nuevo usuario</button>
+    </div>
+    <div id="adminPanelUsers">
+      <div class="mgr-list" id="adminUserList" style="max-height:320px"></div>
+    </div>
+    <div id="adminPanelNew" style="display:none">
+      <div class="form-group">
+        <label for="newUsername">Usuario</label>
+        <input type="text" id="newUsername" autocomplete="off" placeholder="Ej: juancarlos">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="newUserRole">Rol</label>
+          <select id="newUserRole">
+            <option value="usuario">Usuario</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="newUserPass">Contrasena inicial</label>
+          <input type="text" id="newUserPass" autocomplete="off" placeholder="Min. 6 caracteres">
+        </div>
+      </div>
+      <div class="login-error" id="newUserError"></div>
+      <div class="modal-actions" style="margin-top:0.5rem">
+        <button type="button" class="btn-cancel" id="btnNewUserCancel">Cancelar</button>
+        <button type="button" class="btn-save" id="btnCreateUser">Crear usuario</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Cambiar contrasena -->
+<div class="modal-overlay" id="chpassOverlay" role="dialog" aria-modal="true" aria-labelledby="chpassTitle">
+  <div class="modal modal-sm">
+    <div class="modal-handle" aria-hidden="true"></div>
+    <button type="button" class="modal-close" id="btnCloseChpass" aria-label="Cerrar">&#10005;</button>
+    <div class="modal-title" id="chpassTitle">Cambiar contrasena</div>
+    <div class="form-group">
+      <label for="chpassCurrent">Contrasena actual</label>
+      <input type="password" id="chpassCurrent" placeholder="••••••••">
+    </div>
+    <div class="form-group">
+      <label for="chpassNew">Nueva contrasena</label>
+      <input type="password" id="chpassNew" placeholder="Min. 6 caracteres">
+    </div>
+    <div class="form-group">
+      <label for="chpassConfirm">Confirmar nueva contrasena</label>
+      <input type="password" id="chpassConfirm" placeholder="Repetir contrasena">
+    </div>
+    <div class="login-error" id="chpassError"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" id="btnChpassCancel">Cancelar</button>
+      <button type="button" class="btn-save" id="btnChpassSave">Guardar</button>
+    </div>
+  </div>
+</div>
+
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
   <!-- Configuracion Firebase -->
   <script>
@@ -377,5 +497,25 @@
 
   <!-- Logica de la aplicacion -->
   <script src="app.js"></script>
+
+<!-- HISTORIAL PANEL -->
+<div id="historialBackdrop" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:450;backdrop-filter:blur(2px)"></div>
+<div id="historialPanel" class="historial-panel" role="dialog" aria-modal="true" aria-labelledby="historialTitle">
+  <div class="historial-header">
+    <div>
+      <div class="historial-title" id="historialTitle">🕐 Historial de cambios</div>
+      <div class="historial-subtitle">Últimos 200 registros</div>
+    </div>
+    <button type="button" class="modal-close" id="btnCloseHistorial" aria-label="Cerrar">&#10005;</button>
+  </div>
+  <div class="hist-filters">
+    <button class="hist-filter-btn active" data-filter="todos">Todos</button>
+    <button class="hist-filter-btn" data-filter="stock">📦 Stock</button>
+    <button class="hist-filter-btn" data-filter="edicion">✏️ Ediciones</button>
+  </div>
+  <div class="historial-list" id="historialList">
+    <div class="hist-empty">Abre el historial para ver los registros</div>
+  </div>
+</div>
 </body>
 </html>
