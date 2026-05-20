@@ -712,13 +712,22 @@
     db.ref("usuarios/" + uid).once("value").then(function(snap) {
       var u = snap.val();
       if (!u) { toast("Usuario no encontrado"); return; }
-      var label = newRole === "admin" ? "administrador" : "usuario";
-      if (!confirm("¿Cambiar el rol de " + u.username + " a " + label + "?")) { return; }
-      db.ref("usuarios/" + uid + "/role").set(newRole).then(function() {
-        toast(u.username + " ahora es " + label);
-        loadAdminUserList();
-      }).catch(function() {
-        toast("Error al cambiar el rol");
+      var label = newRole === "admin" ? "Admin" : "Usuario";
+      openGC({
+        icon: "👤",
+        title: "Cambiar rol",
+        msg1: "¿Cambiar el rol de",
+        name: u.username,
+        msg2: "a " + label + "? Aplica en el próximo login.",
+        confirmLabel: "Cambiar",
+        onConfirm: function() {
+          db.ref("usuarios/" + uid + "/role").set(newRole).then(function() {
+            toast(u.username + " ahora es " + label);
+            loadAdminUserList();
+          }).catch(function() {
+            toast("Error al cambiar el rol");
+          });
+        }
       });
     });
   }
@@ -727,10 +736,11 @@
     db.ref("usuarios/" + uid).once("value").then(function(snap) {
       var u = snap.val();
       if (!u) { toast("Usuario no encontrado"); return; }
-      var newPass = prompt("Nueva contraseña para " + u.username + " (mín. 6 caracteres):");
-      if (!newPass || newPass.length < 6) { toast("Contraseña inválida"); return; }
+      var newPass = prompt("Nueva contraseña para " + u.username + "\n(mínimo 6 caracteres):");
+      if (newPass === null) { return; } /* cancelled */
+      if (!newPass || newPass.length < 6) { toast("Contraseña inválida — mínimo 6 caracteres"); return; }
       db.ref("pendingReset/" + uid).set({ newPass: newPass, by: currentUser.uid, at: Date.now() })
-        .then(function() { toast("Reset guardado — se aplicará en el próximo login de " + u.username); });
+        .then(function() { toast("✓ Contraseña reseteada — aplicará en el próximo login de " + u.username); });
     });
   }
 
