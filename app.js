@@ -1165,27 +1165,31 @@
     var wrap = document.getElementById("subcatTabs");
     if (!wrap) { return; }
 
-    /* Don't render counts until Firebase has fully loaded both inventories */
-    if (!fullyLoaded) { return; }
-
     /* Always count from the FULL product list, ignoring active filters */
     var allProds = ps();
     var counts = {};
     SUBCATS.forEach(function(s) { counts[s.id] = 0; });
-    allProds.forEach(function(p) {
-      if (p.subcategoria && counts[p.subcategoria] !== undefined) {
-        counts[p.subcategoria]++;
-      }
-    });
 
-    var h = "<button class=\"subcat-all-btn" + (filterSubcat === "todos" ? " active" : "") + "\" id=\"subcatAll\">" + tr("allSubcats") + " <span class=\"subcat-tab-count\" style=\"background:var(--surface2);color:var(--muted)\">" + allProds.length + "</span></button>";
+    /* Only show counts after fully loaded to avoid wrong numbers */
+    if (fullyLoaded) {
+      allProds.forEach(function(p) {
+        if (p.subcategoria && counts[p.subcategoria] !== undefined) {
+          counts[p.subcategoria]++;
+        }
+      });
+    }
+
+    var h = "<button class=\"subcat-all-btn" + (filterSubcat === "todos" ? " active" : "") + "\" id=\"subcatAll\">" + tr("allSubcats");
+    if (fullyLoaded) { h += " <span class=\"subcat-tab-count\" style=\"background:var(--surface2);color:var(--muted)\">" + allProds.length + "</span>"; }
+    h += "</button>";
+
     SUBCATS.forEach(function(s) {
       var isActive = filterSubcat === s.id;
       var cnt = counts[s.id];
       h += "<button class=\"subcat-tab" + (isActive ? " active" : "") + "\" data-subcat=\"" + s.id + "\">";
       h += "<span class=\"subcat-tab-icon\">" + s.iconES + "</span>";
       h += (lang === "es" ? s.labelES : s.labelEN);
-      h += "<span class=\"subcat-tab-count\">" + cnt + "</span>";
+      if (fullyLoaded) { h += "<span class=\"subcat-tab-count\">" + cnt + "</span>"; }
       h += "</button>";
     });
     wrap.innerHTML = h;
