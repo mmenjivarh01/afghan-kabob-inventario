@@ -1655,9 +1655,7 @@
     }, 150);
   }
   function closeCatMgr() { document.getElementById("catMgrOverlay").classList.remove("open"); }
-  document.getElementById("catMgrOverlay").addEventListener("click", function(e) {
-    if (e.target === e.currentTarget) { closeCatMgr(); }
-  });
+  /* catMgrOverlay: NO cierra al hacer clic en el fondo */
 
   function renderCatMgrList() {
     var list = document.getElementById("catManagerList");
@@ -1849,9 +1847,7 @@
     }, 150);
   }
   function closeUnitMgr() { document.getElementById("unitMgrOverlay").classList.remove("open"); }
-  document.getElementById("unitMgrOverlay").addEventListener("click", function(e) {
-    if (e.target === e.currentTarget) { closeUnitMgr(); }
-  });
+  /* unitMgrOverlay: NO cierra al hacer clic en el fondo */
 
   function renderUnitMgrList() {
     var list = document.getElementById("unitManagerList");
