@@ -1208,18 +1208,23 @@
     var wrap = document.getElementById("filterBtns");
     if (!wrap) { return; }
 
-    /* Get categories available in the active subcat */
-    var prods = ps();
-    var visibleProds = filterSubcat === "todos"
-      ? prods
-      : prods.filter(function(p) { return p.subcategoria === filterSubcat; });
+    /* Get categories that actually exist in the active subcat */
+    var allProds = ps();
+    var subcatProds = filterSubcat === "todos"
+      ? allProds
+      : allProds.filter(function(p) { return p.subcategoria === filterSubcat; });
 
+    /* Build ordered unique category list from matching products */
     var catsInView = [];
-    visibleProds.forEach(function(p) {
+    /* Preserve cs() order where possible */
+    cs().forEach(function(c) {
+      var hasProds = subcatProds.some(function(p) { return p.categoria === c; });
+      if (hasProds && catsInView.indexOf(c) < 0) { catsInView.push(c); }
+    });
+    /* Also catch any categories not in cs() (edge case) */
+    subcatProds.forEach(function(p) {
       if (p.categoria && catsInView.indexOf(p.categoria) < 0) { catsInView.push(p.categoria); }
     });
-    /* Keep original order from cs() */
-    catsInView = cs().filter(function(c) { return catsInView.indexOf(c) >= 0; });
 
     /* Clean up filterCats — remove any that don't exist in this view */
     filterCats = filterCats.filter(function(c) { return catsInView.indexOf(c) >= 0; });
@@ -1238,11 +1243,8 @@
       btn.addEventListener("click", function() {
         var cat = btn.dataset.cat;
         var idx = filterCats.indexOf(cat);
-        if (idx >= 0) {
-          filterCats.splice(idx, 1); /* deselect */
-        } else {
-          filterCats.push(cat); /* add to selection */
-        }
+        if (idx >= 0) { filterCats.splice(idx, 1); }
+        else { filterCats.push(cat); }
         renderCatFilterBtns(); render();
       });
     });
