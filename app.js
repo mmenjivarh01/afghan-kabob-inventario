@@ -662,33 +662,63 @@
     db.ref("usuarios").once("value").then(function(snap) {
       var users = snap.val() || {};
       var h = "";
-      /* Add guest entry */
+      /* Guest entry */
       h += "<div class='admin-user-item'>";
       h += "<div class='admin-user-avatar guest'>G</div>";
       h += "<div class='admin-user-info'><div class='admin-user-name'>Invitado</div><div class='admin-user-email'>Sin contraseña — solo lectura</div></div>";
       h += "<span class='admin-user-role role-invitado'>Invitado</span>";
       h += "</div>";
+
       Object.keys(users).forEach(function(uid) {
         var u = users[uid];
-        var initial = (u.username || "?")[0].toUpperCase();
-        var roleClass = u.role === "admin" ? "role-admin" : "role-usuario";
+        var initial   = (u.username || "?")[0].toUpperCase();
+        var isAdmin   = u.role === "admin";
+        var isSelf    = uid === (currentUser && currentUser.uid);
+        var roleClass = isAdmin ? "role-admin" : "role-usuario";
+        var roleLabel = isAdmin ? "admin" : "usuario";
+
         h += "<div class='admin-user-item'>";
         h += "<div class='admin-user-avatar'>" + initial + "</div>";
         h += "<div class='admin-user-info'>";
         h += "<div class='admin-user-name'>" + escapeHTML(u.username || "") + "</div>";
         h += "<div class='admin-user-email'>" + escapeHTML(u.email || "") + "</div>";
         h += "</div>";
-        h += "<span class='admin-user-role " + roleClass + "'>" + escapeHTML(u.role || "") + "</span>";
+        h += "<span class='admin-user-role " + roleClass + "'>" + roleLabel + "</span>";
         h += "<div class='admin-user-actions'>";
-        /* Reset password button — not for self */
-        if (uid !== (currentUser && currentUser.uid)) {
+        if (!isSelf) {
+          /* Role toggle button */
+          var newRole  = isAdmin ? "usuario" : "admin";
+          var roleIcon = isAdmin ? "⬇️" : "⬆️";
+          var roleTitle = isAdmin ? "Cambiar a Usuario" : "Cambiar a Admin";
+          h += "<button class='admin-action-btn' title='" + roleTitle + "' data-uid='" + uid + "' data-role='" + newRole + "' data-action='role'>" + roleIcon + "</button>";
+          /* Reset password button */
           h += "<button class='admin-action-btn' title='Resetear contraseña' data-uid='" + uid + "' data-action='reset'>🔑</button>";
         }
         h += "</div></div>";
       });
+
       list.innerHTML = h || "<div style='text-align:center;padding:1rem;color:var(--muted)'>Sin usuarios</div>";
+
       list.querySelectorAll("[data-action='reset']").forEach(function(btn) {
         btn.addEventListener("click", function() { adminResetPassword(btn.dataset.uid); });
+      });
+      list.querySelectorAll("[data-action='role']").forEach(function(btn) {
+        btn.addEventListener("click", function() { adminChangeRole(btn.dataset.uid, btn.dataset.role); });
+      });
+    });
+  }
+
+  function adminChangeRole(uid, newRole) {
+    db.ref("usuarios/" + uid).once("value").then(function(snap) {
+      var u = snap.val();
+      if (!u) { toast("Usuario no encontrado"); return; }
+      var label = newRole === "admin" ? "administrador" : "usuario";
+      if (!confirm("¿Cambiar el rol de " + u.username + " a " + label + "?")) { return; }
+      db.ref("usuarios/" + uid + "/role").set(newRole).then(function() {
+        toast(u.username + " ahora es " + label);
+        loadAdminUserList();
+      }).catch(function() {
+        toast("Error al cambiar el rol");
       });
     });
   }
@@ -699,9 +729,6 @@
       if (!u) { toast("Usuario no encontrado"); return; }
       var newPass = prompt("Nueva contraseña para " + u.username + " (mín. 6 caracteres):");
       if (!newPass || newPass.length < 6) { toast("Contraseña inválida"); return; }
-      /* Use Firebase Admin via REST — requires using the user's current session */
-      /* Since we can't call Admin SDK from client, we store a pending reset in DB */
-      /* The next time that user logs in, we check for a pending reset */
       db.ref("pendingReset/" + uid).set({ newPass: newPass, by: currentUser.uid, at: Date.now() })
         .then(function() { toast("Reset guardado — se aplicará en el próximo login de " + u.username); });
     });
