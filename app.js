@@ -1710,39 +1710,85 @@
 
     var h = "";
     for (var i = 0; i < tempCats.length; i++) {
-      var p    = PAL[i % PAL.length];
-      var c    = tempCats[i];
-      var icon = tempCatIcons[c] || "";
-      var otherLabel = lang === "es"
-        ? (trans[c]   ? " / " + trans[c]   : "")
-        : (reverse[c] ? " / " + reverse[c] : "");
+      var p         = PAL[i % PAL.length];
+      var c         = tempCats[i];
+      var icon      = tempCatIcons[c] || "";
+      var otherName = lang === "es" ? (trans[c] || "") : (reverse[c] || "");
+      var flagOther = lang === "es" ? "🇬🇧" : "🇪🇸";
 
-      h += "<div class=\"mgr-item\">";
-      h += "<input class=\"mgr-icon-input\" type=\"text\" value=\"" + escapeHTML(icon) + "\" data-iconidx=\"" + i + "\" placeholder=\"🏷️\" maxlength=\"4\" title=\"Emoji\">";
+      h += "<div class=\"mgr-item mgr-item-view\" data-rowid=\"" + i + "\">";
+      /* VIEW mode */
+      h += "<span class=\"mgr-icon-view\">" + (icon || "🏷️") + "</span>";
       h += "<div class=\"mgr-dot\" style=\"background:" + p.color + "\"></div>";
-      h += "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(c) + "\" data-idx=\"" + i + "\">";
-      h += "<span class=\"mgr-other-lang\">" + escapeHTML(otherLabel) + "</span>";
+      h += "<div class=\"mgr-names-view\">";
+      h += "<span class=\"mgr-name-main\">" + escapeHTML(c) + "</span>";
+      if (otherName) { h += "<span class=\"mgr-name-other\">" + flagOther + " " + escapeHTML(otherName) + "</span>"; }
+      h += "</div>";
+      h += "<div class=\"mgr-row-actions\">";
+      h += "<button class=\"mgr-edit-btn\" data-editidx=\"" + i + "\" title=\"Editar\">✏️</button>";
       h += "<button class=\"mgr-del\" data-delidx=\"" + i + "\">&#10005;</button>";
+      h += "</div>";
       h += "</div>";
     }
     list.innerHTML = h;
 
-    list.querySelectorAll(".mgr-icon-input").forEach(function(inp) {
-      inp.addEventListener("change", function() {
-        var idx  = parseInt(inp.dataset.iconidx, 10);
-        var cat  = tempCats[idx];
-        var icon = inp.value.trim();
-        if (icon) { tempCatIcons[cat] = icon; }
-        else { delete tempCatIcons[cat]; }
+    /* Edit button — switches row to edit mode */
+    list.querySelectorAll(".mgr-edit-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var idx      = parseInt(btn.dataset.editidx, 10);
+        var c        = tempCats[idx];
+        var icon     = tempCatIcons[c] || "";
+        var otherName = lang === "es"
+          ? (tempCatTrans[c] || "")
+          : (Object.keys(tempCatTrans).find(function(k){ return tempCatTrans[k] === c; }) ? tempCatTrans[Object.keys(tempCatTrans).find(function(k){ return tempCatTrans[k] === c; })] : "");
+        var row = btn.closest(".mgr-item-view");
+        var flagCurrent = lang === "es" ? "🇪🇸" : "🇬🇧";
+        var flagOther   = lang === "es" ? "🇬🇧" : "🇪🇸";
+        var placeholderOther = lang === "es" ? "English" : "Español";
+
+        row.classList.add("mgr-item-editing");
+        row.innerHTML =
+          "<input class=\"mgr-icon-input\" type=\"text\" value=\"" + escapeHTML(icon) + "\" data-iconidx=\"" + idx + "\" placeholder=\"🏷️\" maxlength=\"4\">" +
+          "<div class=\"mgr-dot\" style=\"background:" + PAL[idx % PAL.length].color + "\"></div>" +
+          "<div class=\"mgr-names\">" +
+            "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(c) + "\" data-idx=\"" + idx + "\" placeholder=\"" + flagCurrent + "\">" +
+            "<input class=\"mgr-input mgr-input-other\" type=\"text\" value=\"" + escapeHTML(otherName) + "\" data-otheridx=\"" + idx + "\" placeholder=\"" + flagOther + " " + placeholderOther + "\">" +
+          "</div>" +
+          "<button class=\"mgr-save-btn\" data-saveidx=\"" + idx + "\" title=\"Guardar\">✓</button>";
+
+        /* Save button */
+        row.querySelector(".mgr-save-btn").addEventListener("click", function() {
+          var newName  = row.querySelector(".mgr-input").value.trim();
+          var newOther = row.querySelector(".mgr-input-other").value.trim();
+          var newIcon  = row.querySelector(".mgr-icon-input").value.trim();
+          if (!newName) { return; }
+
+          var oldName = tempCats[idx];
+          tempCats[idx] = newName;
+
+          /* Update icon */
+          if (newIcon) { tempCatIcons[newName] = newIcon; }
+          else { delete tempCatIcons[newName]; }
+          if (newName !== oldName) { delete tempCatIcons[oldName]; }
+
+          /* Update translation */
+          var reverse2 = {};
+          Object.keys(tempCatTrans).forEach(function(es) { reverse2[tempCatTrans[es]] = es; });
+          if (lang === "es") {
+            delete tempCatTrans[oldName];
+            if (newOther) { tempCatTrans[newName] = newOther; }
+          } else {
+            var oldES = reverse2[oldName] || oldName;
+            delete tempCatTrans[oldES];
+            if (newOther) { tempCatTrans[newOther] = newName; }
+          }
+          renderCatMgrList();
+        });
+
+        row.querySelector(".mgr-input").focus();
       });
     });
-    list.querySelectorAll(".mgr-input").forEach(function(inp) {
-      inp.addEventListener("change", function() {
-        var idx = parseInt(inp.dataset.idx, 10);
-        var v   = inp.value.trim();
-        if (v) { tempCats[idx] = v; }
-      });
-    });
+
     list.querySelectorAll(".mgr-del").forEach(function(btn) {
       btn.addEventListener("click", function() {
         eliminarTempCat(parseInt(btn.dataset.delidx, 10));
@@ -1802,12 +1848,7 @@
   }
 
   function guardarCategorias() {
-    /* Capture any inline edits to name and icon fields */
-    document.querySelectorAll("#catManagerList .mgr-input").forEach(function(inp) {
-      var i = parseInt(inp.dataset.idx, 10);
-      var v = inp.value.trim();
-      if (v) { tempCats[i] = v; }
-    });
+    /* Changes are committed per-row via the ✓ button — no need to capture inputs here */
     document.querySelectorAll("#catManagerList .mgr-icon-input").forEach(function(inp) {
       var i    = parseInt(inp.dataset.iconidx, 10);
       var cat  = tempCats[i];
@@ -1902,25 +1943,65 @@
 
     var h = "";
     for (var i = 0; i < tempUnits.length; i++) {
-      var u = tempUnits[i];
-      var otherLabel = lang === "es"
-        ? (trans[u]   ? " / " + trans[u]   : "")
-        : (reverse[u] ? " / " + reverse[u] : "");
-      h += "<div class=\"mgr-item\">";
+      var u         = tempUnits[i];
+      var otherName = lang === "es" ? (trans[u] || "") : (reverse[u] || "");
+      var flagOther = lang === "es" ? "🇬🇧" : "🇪🇸";
+
+      h += "<div class=\"mgr-item mgr-item-view\" data-rowid=\"" + i + "\">";
       h += "<div class=\"mgr-dot\" style=\"background:var(--gold)\"></div>";
-      h += "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(u) + "\" data-idx=\"" + i + "\">";
-      h += "<span class=\"mgr-other-lang\">" + escapeHTML(otherLabel) + "</span>";
-      h += "<button class=\"mgr-del\" data-delidx=\"" + i + "\">&#10005;</button>";
+      h += "<div class=\"mgr-names-view\">";
+      h += "<span class=\"mgr-name-main\">" + escapeHTML(u) + "</span>";
+      if (otherName) { h += "<span class=\"mgr-name-other\">" + flagOther + " " + escapeHTML(otherName) + "</span>"; }
       h += "</div>";
+      h += "<div class=\"mgr-row-actions\">";
+      h += "<button class=\"mgr-edit-btn\" data-editidx=\"" + i + "\" title=\"Editar\">✏️</button>";
+      h += "<button class=\"mgr-del\" data-delidx=\"" + i + "\">&#10005;</button>";
+      h += "</div></div>";
     }
     list.innerHTML = h;
-    list.querySelectorAll(".mgr-input").forEach(function(inp) {
-      inp.addEventListener("change", function() {
-        var idx = parseInt(inp.dataset.idx, 10);
-        var v   = inp.value.trim();
-        if (v) { tempUnits[idx] = v; }
+
+    list.querySelectorAll(".mgr-edit-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var idx       = parseInt(btn.dataset.editidx, 10);
+        var u         = tempUnits[idx];
+        var otherName = lang === "es"
+          ? (tempUnitTrans[u] || "")
+          : (function(){ var rev={}; Object.keys(tempUnitTrans).forEach(function(k){ rev[tempUnitTrans[k]]=k; }); return rev[u]||""; }());
+        var flagCurrent     = lang === "es" ? "🇪🇸" : "🇬🇧";
+        var flagOther       = lang === "es" ? "🇬🇧" : "🇪🇸";
+        var placeholderOther = lang === "es" ? "English" : "Español";
+        var row = btn.closest(".mgr-item-view");
+        row.classList.add("mgr-item-editing");
+        row.innerHTML =
+          "<div class=\"mgr-dot\" style=\"background:var(--gold)\"></div>" +
+          "<div class=\"mgr-names\">" +
+            "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(u) + "\" data-idx=\"" + idx + "\" placeholder=\"" + flagCurrent + "\">" +
+            "<input class=\"mgr-input mgr-input-other\" type=\"text\" value=\"" + escapeHTML(otherName) + "\" data-otheridx=\"" + idx + "\" placeholder=\"" + flagOther + " " + placeholderOther + "\">" +
+          "</div>" +
+          "<button class=\"mgr-save-btn\" data-saveidx=\"" + idx + "\" title=\"Guardar\">✓</button>";
+
+        row.querySelector(".mgr-save-btn").addEventListener("click", function() {
+          var newName  = row.querySelector(".mgr-input").value.trim();
+          var newOther = row.querySelector(".mgr-input-other").value.trim();
+          if (!newName) { return; }
+          var oldName = tempUnits[idx];
+          tempUnits[idx] = newName;
+          var reverse2 = {};
+          Object.keys(tempUnitTrans).forEach(function(es) { reverse2[tempUnitTrans[es]] = es; });
+          if (lang === "es") {
+            delete tempUnitTrans[oldName];
+            if (newOther) { tempUnitTrans[newName] = newOther; }
+          } else {
+            var oldES = reverse2[oldName] || oldName;
+            delete tempUnitTrans[oldES];
+            if (newOther) { tempUnitTrans[newOther] = newName; }
+          }
+          renderUnitMgrList();
+        });
+        row.querySelector(".mgr-input").focus();
       });
     });
+
     list.querySelectorAll(".mgr-del").forEach(function(btn) {
       btn.addEventListener("click", function() {
         eliminarTempUnit(parseInt(btn.dataset.delidx, 10));
@@ -1975,11 +2056,7 @@
   }
 
   function guardarUnidades() {
-    document.querySelectorAll("#unitManagerList .mgr-input").forEach(function(inp) {
-      var i = parseInt(inp.dataset.idx, 10);
-      var v = inp.value.trim();
-      if (v) { tempUnits[i] = v; }
-    });
+    /* Changes are committed per-row via the ✓ button */
     var seen = {};
     tempUnits = tempUnits.filter(function(u) {
       var k = u.toLowerCase();
