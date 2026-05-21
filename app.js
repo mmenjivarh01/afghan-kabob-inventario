@@ -663,7 +663,9 @@
       t.classList.toggle("active", t.dataset.tab === tab);
     });
     document.getElementById("adminPanelUsers").style.display = tab === "usuarios" ? "" : "none";
-    document.getElementById("adminPanelNew").style.display   = tab === "nuevo" ? "" : "none";
+    var panelNew = document.getElementById("adminPanelNew");
+    if (tab === "nuevo") { panelNew.classList.remove("hidden-initially"); panelNew.style.display = ""; }
+    else { panelNew.classList.add("hidden-initially"); panelNew.style.display = "none"; }
     if (tab === "nuevo") {
       document.getElementById("newUsername").value = "";
       document.getElementById("newUserPass").value = "";
@@ -2214,9 +2216,9 @@
     var filterParts = [];
     if (subcat !== "todos") {
       var s = SUBCATS.find(function(x){ return x.id === subcat; });
-      if (s) { filterParts.push(s.iconES + " " + (lang === "es" ? s.labelES : s.labelEN)); }
+      if (s) { filterParts.push(lang === "es" ? s.labelES : s.labelEN); }
     }
-    if (cat !== "todos") { filterParts.push(catIcon(cat) + " " + cat); }
+    if (cat !== "todos") { filterParts.push(cat); }
     if (content === "bajo") { filterParts.push(lang === "es" ? "Solo bajo stock / agotados" : "Low stock & out of stock"); }
     var filterLabel = filterParts.join(" · ");
 
@@ -2243,12 +2245,9 @@
       var diffSign = diff > 0 ? "+" : "";
       var diffStyle = diff > 0 ? "color:#1a6e3a;font-weight:700;"
         : diff === 0 ? "color:#555;" : "color:#b02020;font-weight:700;";
-      var subcatIcon2 = subcatIcon(x.subcategoria);
-      var cIcon       = catIcon(x.categoria);
       rows += "<tr>";
       rows += "<td><strong>" + escapeHTML(x.nombre) + "</strong></td>";
-      rows += "<td><span class=\"pp-badge\">" + (cIcon ? cIcon + " " : "") + escapeHTML(x.categoria) + "</span>" +
-              (subcatIcon2 ? " <span style=\"font-size:0.85em\">" + subcatIcon2 + "</span>" : "") + "</td>";
+      rows += "<td><span class=\"pp-badge\">" + escapeHTML(x.categoria) + "</span></td>";
       rows += "<td><strong>" + x.cantidad + "</strong></td>";
       rows += "<td style=\"" + diffStyle + "\">" + diffSign + diff + "</td>";
       rows += "<td>" + escapeHTML(x.unidad) + "</td>";
@@ -2440,12 +2439,14 @@
   function openHistorial() {
     historialOpen = true;
     document.getElementById("historialPanel").classList.add("open");
+    document.getElementById("historialBackdrop").classList.remove("hidden-initially");
     document.getElementById("historialBackdrop").style.display = "";
     loadHistorial();
   }
   function closeHistorial() {
     historialOpen = false;
     document.getElementById("historialPanel").classList.remove("open");
+    document.getElementById("historialBackdrop").classList.add("hidden-initially");
     document.getElementById("historialBackdrop").style.display = "none";
   }
 

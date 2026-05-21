@@ -6,7 +6,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Inventario AK">
-  <meta name="theme-color" content="#eaefe9">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="https://placehold.co/192x192/6b1a2a/ffffff?text=AK">
   <meta name="color-scheme" content="light">
@@ -94,28 +93,28 @@
   <div class="header-right">
     <span class="header-date" id="headerDate" aria-live="polite"></span>
     <span class="header-user" id="headerUser" aria-live="polite"></span>
-    <button type="button" class="btn-sm" id="btnHistorial" aria-label="Historial de cambios" style="display:none">🕐</button>
-    <button type="button" class="btn-sm btn-user-menu" id="btnUserMenu" aria-label="Menu de usuario" style="display:none">👤 <span id="headerUserName"></span></button>
+    <button type="button" class="btn-sm" id="btnHistorial" aria-label="Historial de cambios" class="hidden-initially">🕐</button>
+    <button type="button" class="btn-sm btn-user-menu" id="btnUserMenu" aria-label="Menu de usuario" class="hidden-initially">👤 <span id="headerUserName"></span></button>
     <button type="button" class="btn-sm" id="btnLang" aria-label="Cambiar idioma">EN</button>
     <button type="button" class="btn-sm" id="btnPrint" aria-label="Imprimir o descargar PDF">Imprimir / PDF</button>
   </div>
 </header>
 
 <!-- USER DROPDOWN MENU -->
-<div id="userDropdown" class="user-dropdown" style="display:none" role="menu">
-  <div class="user-dropdown-name" id="dropdownUserName"></div>
-  <div class="user-dropdown-role" id="dropdownUserRole"></div>
-  <div class="user-dropdown-divider"></div>
-  <button type="button" class="user-dropdown-item" id="btnChangePass">🔑 Cambiar contraseña</button>
-  <button type="button" class="user-dropdown-item" id="btnAdminPanel" style="display:none">⚙️ Panel de Admin</button>
-  <div class="user-dropdown-divider"></div>
-  <button type="button" class="user-dropdown-item danger" id="btnLogout">↩ Cerrar sesión</button>
+<div id="userDropdown" class="user-dropdown hidden-initially" role="menu">
+  <div class="user-dropdown-name" id="dropdownUserName" role="presentation"></div>
+  <div class="user-dropdown-role" id="dropdownUserRole" role="presentation"></div>
+  <div class="user-dropdown-divider" role="separator"></div>
+  <button type="button" class="user-dropdown-item" id="btnChangePass" role="menuitem">🔑 Cambiar contraseña</button>
+  <button type="button" class="user-dropdown-item hidden-initially" id="btnAdminPanel" role="menuitem">⚙️ Panel de Admin</button>
+  <div class="user-dropdown-divider" role="separator"></div>
+  <button type="button" class="user-dropdown-item danger" id="btnLogout" role="menuitem">↩ Cerrar sesión</button>
 </div>
 <!-- BANNER INVITADO -->
 <div class="guest-banner" id="guestBanner">👁 Modo Invitado — solo lectura</div>
 
 <!-- AVISO INACTIVIDAD -->
-<div id="inactivityWarning" style="display:none" class="inactivity-warning">
+<div id="inactivityWarning" class="inactivity-warning hidden-initially">
   <span>⏱ Tu sesión cerrará en <strong id="inactivityCountdown">60</strong> segundos por inactividad.</span>
   <button type="button" id="btnExtendSession" class="btn-extend">Extender sesión</button>
 </div>
@@ -302,7 +301,7 @@
     <div class="mgr-section-label" id="catMgrAdd">Agregar categoria</div>
     <div class="mgr-add-row">
       <input type="text" class="mgr-add-input mgr-add-icon" id="catNewIcon" autocomplete="off"
-             placeholder="🏷️" aria-label="Icono emoji" maxlength="4" style="max-width:56px;text-align:center;font-size:1.2rem">
+             placeholder="🏷️" aria-label="Icono emoji" maxlength="4" class="cat-icon-field">
       <input type="text" class="mgr-add-input" id="catNewNameES" autocomplete="off"
              placeholder="&#127466;&#127480; Espanol" aria-label="Nombre en espanol">
       <input type="text" class="mgr-add-input" id="catNewNameEN" autocomplete="off"
@@ -408,7 +407,7 @@
 </div>
 
 <!-- PANTALLA DE LOGIN -->
-<div id="loginScreen" style="display:none">
+<div id="loginScreen" class="hidden-initially">
   <div class="login-bg">
     <div class="login-card">
       <div class="login-logo">Afghan Kabob &amp; Grill</div>
@@ -449,9 +448,9 @@
       <button type="button" class="admin-tab" data-tab="nuevo">+ Nuevo usuario</button>
     </div>
     <div id="adminPanelUsers">
-      <div class="mgr-list" id="adminUserList" style="max-height:320px"></div>
+      <div class="mgr-list mgr-list-tall" id="adminUserList"></div>
     </div>
-    <div id="adminPanelNew" style="display:none">
+    <div id="adminPanelNew" class="hidden-initially">
       <div class="form-group">
         <label for="newUsername">Usuario</label>
         <input type="text" id="newUsername" autocomplete="off" placeholder="Ej: juancarlos">
@@ -470,7 +469,7 @@
         </div>
       </div>
       <div class="login-error" id="newUserError"></div>
-      <div class="modal-actions" style="margin-top:0.5rem">
+      <div class="modal-actions modal-actions-top">
         <button type="button" class="btn-cancel" id="btnNewUserCancel">Cancelar</button>
         <button type="button" class="btn-save" id="btnCreateUser">Crear usuario</button>
       </div>
@@ -530,7 +529,7 @@
   <script src="app.js"></script>
 
 <!-- HISTORIAL PANEL -->
-<div id="historialBackdrop" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:450;backdrop-filter:blur(2px)"></div>
+<div id="historialBackdrop" class="historial-backdrop hidden-initially"></div>
 <div id="historialPanel" class="historial-panel" role="dialog" aria-modal="true" aria-labelledby="historialTitle">
   <div class="historial-header">
     <div>
