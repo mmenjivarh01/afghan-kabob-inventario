@@ -353,6 +353,21 @@
     if (main) { main.style.display = "none"; }
     var gb = document.getElementById("guestBanner");
     if (gb) { gb.style.display = "none"; }
+    /* Apply login labels in English */
+    var lUser = document.querySelector("label[for='loginUser']");
+    var lPass = document.querySelector("label[for='loginPass']");
+    var lRemember = document.querySelector("label[for='rememberUser']");
+    var btnLogin = document.getElementById("btnLogin");
+    var btnGuest = document.getElementById("btnGuest");
+    if (lUser)    { lUser.textContent = "Username"; }
+    if (lPass)    { lPass.textContent = "Password"; }
+    if (lRemember){ lRemember.textContent = "Remember me"; }
+    if (btnLogin) { btnLogin.textContent = "Sign In"; }
+    if (btnGuest) { btnGuest.innerHTML = "👁 Enter as Guest"; }
+    var loginUser = document.getElementById("loginUser");
+    var loginPass = document.getElementById("loginPass");
+    if (loginUser) { loginUser.placeholder = "E.g.: Admin"; }
+    if (loginPass) { loginPass.placeholder = "••••••••"; }
     prefillLoginUser();
   }
 
@@ -2100,114 +2115,177 @@
     ".pp-danger{color:#b02020;font-weight:700;}" +
     ".pp-footer{display:flex;justify-content:space-between;margin-top:1rem;font-size:7pt;color:#999;border-top:1px solid #ddd;padding-top:0.5rem;}";
 
-  function buildReport(filtro) {
-    filtro = filtro || "todos";
-    var allSorted = ps().slice().sort(function(a,b){
-      var r=a.categoria.localeCompare(b.categoria);
-      return r!==0?r:a.nombre.localeCompare(b.nombre);
+  function getReportFilters() {
+    return {
+      content: document.getElementById("reportFilter").value  || "todos",
+      subcat:  document.getElementById("reportSubcat").value  || "todos",
+      cat:     document.getElementById("reportCat").value     || "todos"
+    };
+  }
+
+  function updateReportCatSelect() {
+    var subcatVal = document.getElementById("reportSubcat").value || "todos";
+    var catSel    = document.getElementById("reportCat");
+    var allProds  = ps();
+    var filtered  = subcatVal === "todos"
+      ? allProds
+      : allProds.filter(function(p){ return p.subcategoria === subcatVal; });
+
+    var cats = [];
+    cs().forEach(function(c) {
+      if (filtered.some(function(p){ return p.categoria === c; })) { cats.push(c); }
     });
-    var sorted = filtro === "bajo"
-      ? allSorted.filter(function(x) { return x.cantidad < x.minimo; })
-      : allSorted;
+
+    var loc = lang === "es" ? "Todas las categorias" : "All categories";
+    var h   = "<option value=\"todos\">" + loc + "</option>";
+    cats.forEach(function(c) {
+      var icon = catIcon(c);
+      h += "<option value=\"" + escapeHTML(c) + "\">" + (icon ? icon + " " : "") + escapeHTML(c) + "</option>";
+    });
+    catSel.innerHTML = h;
+  }
+
+  function refreshReport() {
+    updateReportCatSelect();
+    var filters = getReportFilters();
+    document.getElementById("previewPage").innerHTML = buildReport(filters);
+  }
+
+  function abrirVistaPrevia() {
+    /* Reset filters */
+    document.getElementById("reportFilter").value = "todos";
+    document.getElementById("reportSubcat").value = "todos";
+    updateReportCatSelect();
+    document.getElementById("reportCat").value = "todos";
+    document.getElementById("previewPage").innerHTML = buildReport({ content:"todos", subcat:"todos", cat:"todos" });
+    document.getElementById("printPreviewOverlay").classList.add("open");
+  }
+
+  function cerrarVistaPrevia() { document.getElementById("printPreviewOverlay").classList.remove("open"); }
+  /* printPreviewOverlay: NO cierra al hacer clic en el fondo — usar X */
+
+  function imprimirDesdePrevia() {
+    var pd = document.getElementById("printDoc");
+    pd.innerHTML = "<style>" + PCSS + "</style>" + buildReport(getReportFilters());
+    window.print();
+    setTimeout(function(){ pd.innerHTML = ""; }, 1500);
+  }
+
+  function descargarPDF() {
+    var filters = getReportFilters();
+    var loc     = lang === "es" ? "es-MX" : "en-US";
+    var fecha   = now.toLocaleDateString(loc,{day:"2-digit",month:"long",year:"numeric"}).replace(/\s/g,"_");
+    var key     = activeInv === "a" ? "MP" : "PT";
+    var sufijo  = filters.content === "bajo" ? "_BajoStock" : "";
+    if (filters.subcat !== "todos") { sufijo += "_" + filters.subcat; }
+    if (filters.cat    !== "todos") { sufijo += "_" + filters.cat; }
+    var html = "<!DOCTYPE html><html lang=\"" + lang + "\"><head><meta charset=\"UTF-8\">" +
+      "<title>Afghan Kabob &amp; Grill - " + (activeInv === "a" ? tr("invA") : tr("invB")) + "</title>" +
+      "<style>" + PCSS + "</style></head><body>" + buildReport(filters) + "</body></html>";
+    var blob = new Blob([html], { type:"text/html;charset=utf-8" });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement("a");
+    a.href = url; a.download = "Inventario_" + key + sufijo + "_" + fecha + ".html";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+    toast(tr("toastPDF"));
+  }
+
+  function buildReport(filters) {
+    if (typeof filters === "string") { filters = { content: filters, subcat: "todos", cat: "todos" }; }
+    var content = filters.content || "todos";
+    var subcat  = filters.subcat  || "todos";
+    var cat     = filters.cat     || "todos";
+
+    /* Apply all filters */
+    var allSorted = ps().slice().sort(function(a,b){
+      var r = a.categoria.localeCompare(b.categoria);
+      return r !== 0 ? r : a.nombre.localeCompare(b.nombre);
+    });
+
+    var sorted = allSorted.filter(function(x) {
+      var matchSubcat  = subcat  === "todos" || x.subcategoria === subcat;
+      var matchCat     = cat     === "todos" || x.categoria    === cat;
+      var matchContent = content === "todos" || x.cantidad < x.minimo;
+      return matchSubcat && matchCat && matchContent;
+    });
+
+    /* Build filter label for report header */
+    var filterParts = [];
+    if (subcat !== "todos") {
+      var s = SUBCATS.find(function(x){ return x.id === subcat; });
+      if (s) { filterParts.push(s.iconES + " " + (lang === "es" ? s.labelES : s.labelEN)); }
+    }
+    if (cat !== "todos") { filterParts.push(catIcon(cat) + " " + cat); }
+    if (content === "bajo") { filterParts.push(lang === "es" ? "Solo bajo stock / agotados" : "Low stock & out of stock"); }
+    var filterLabel = filterParts.join(" · ");
 
     var total = sorted.length;
-    var low   = sorted.filter(function(x){return x.cantidad>0&&x.cantidad<x.minimo;}).length;
-    var out   = sorted.filter(function(x){return x.cantidad===0;}).length;
-    var loc=lang==="es"?"es-MX":"en-US";
-    var fecha=now.toLocaleDateString(loc,{day:"2-digit",month:"long",year:"numeric"});
-    var hora=now.toLocaleTimeString(loc,{hour:"2-digit",minute:"2-digit"});
-    var invName=activeInv==="a"?tr("invA"):tr("invB");
-    var invColor=activeInv==="a"?"#1a4a8a":"#27845a";
-    var thP  = lang==="es" ? "Producto"    : "Product";
-    var thC  = lang==="es" ? "Categoria"   : "Category";
-    var thD  = lang==="es" ? "Diferencia"  : "Difference";
-    var thU  = lang==="es" ? "Unidad"      : "Unit";
-    var thSt = lang==="es" ? "Estado"      : "Status";
+    var low   = sorted.filter(function(x){ return x.cantidad > 0 && x.cantidad < x.minimo; }).length;
+    var out   = sorted.filter(function(x){ return x.cantidad === 0; }).length;
+    var loc   = lang === "es" ? "es-MX" : "en-US";
+    var fecha = now.toLocaleDateString(loc,{day:"2-digit",month:"long",year:"numeric"});
+    var hora  = now.toLocaleTimeString(loc,{hour:"2-digit",minute:"2-digit"});
+    var invName  = activeInv === "a" ? tr("invA") : tr("invB");
+    var invColor = activeInv === "a" ? "#1a4a8a" : "#27845a";
+    var thP  = lang === "es" ? "Producto"   : "Product";
+    var thC  = lang === "es" ? "Categoria"  : "Category";
+    var thD  = lang === "es" ? "Diferencia" : "Difference";
+    var thU  = lang === "es" ? "Unidad"     : "Unit";
+    var thSt = lang === "es" ? "Estado"     : "Status";
+
     var rows = "";
     sorted.forEach(function(x) {
-      var st   = stockStatus(x);
-      var stL  = {ok:tr("ppNormal"), warn:tr("ppLow"), danger:tr("ppOut")}[st];
-      var stC  = {ok:"pp-ok", warn:"pp-warn", danger:"pp-danger"}[st];
-      var diff = x.cantidad - x.minimo;
-      var diffSign  = diff > 0 ? "+" : "";
-      var diffStyle = diff > 0
-        ? "color:#1a6e3a;font-weight:700;"
-        : diff === 0
-          ? "color:#555;"
-          : "color:#b02020;font-weight:700;";
+      var st       = stockStatus(x);
+      var stL      = {ok:tr("ppNormal"), warn:tr("ppLow"), danger:tr("ppOut")}[st];
+      var stC      = {ok:"pp-ok", warn:"pp-warn", danger:"pp-danger"}[st];
+      var diff     = x.cantidad - x.minimo;
+      var diffSign = diff > 0 ? "+" : "";
+      var diffStyle = diff > 0 ? "color:#1a6e3a;font-weight:700;"
+        : diff === 0 ? "color:#555;" : "color:#b02020;font-weight:700;";
+      var subcatIcon2 = subcatIcon(x.subcategoria);
+      var cIcon       = catIcon(x.categoria);
       rows += "<tr>";
-      rows += "<td><strong>" + x.nombre + "</strong></td>";
-      rows += "<td><span class=\"pp-badge\">" + x.categoria + "</span></td>";
+      rows += "<td><strong>" + escapeHTML(x.nombre) + "</strong></td>";
+      rows += "<td><span class=\"pp-badge\">" + (cIcon ? cIcon + " " : "") + escapeHTML(x.categoria) + "</span>" +
+              (subcatIcon2 ? " <span style=\"font-size:0.85em\">" + subcatIcon2 + "</span>" : "") + "</td>";
       rows += "<td><strong>" + x.cantidad + "</strong></td>";
       rows += "<td style=\"" + diffStyle + "\">" + diffSign + diff + "</td>";
-      rows += "<td>" + x.unidad + "</td>";
+      rows += "<td>" + escapeHTML(x.unidad) + "</td>";
       rows += "<td class=\"" + stC + "\">" + stL + "</td>";
       rows += "</tr>";
     });
 
-    var filterLabel = filtro === "bajo"
-      ? (lang === "es" ? "Solo bajo stock y agotados" : "Low stock & out of stock only")
-      : "";
-
     var emptyMsg = sorted.length === 0
-      ? "<tr><td colspan=\"6\" style=\"text-align:center;padding:1.5rem;color:#888;\">"
-        + (lang === "es" ? "No hay productos bajo stock." : "No products below minimum stock.")
-        + "</td></tr>"
+      ? "<tr><td colspan=\"6\" style=\"text-align:center;padding:1.5rem;color:#888;\">" +
+        (lang === "es" ? "No hay productos con estos filtros." : "No products match these filters.") + "</td></tr>"
       : rows;
 
-    return "<div class=\"pp-header\"><div>"+
-      "<div class=\"pp-logo-title\">Afghan Kabob &amp; Grill</div>"+
-      "<div class=\"pp-logo-sub\">"+tr("reportTitle")+"</div>"+
-      (filterLabel ? "<div class=\"pp-filter-label\">"+filterLabel+"</div>" : "")+
-      "<div class=\"pp-inv-type\" style=\"color:"+invColor+"\">"+invName+"</div></div>"+
-      "<div class=\"pp-meta\">"+tr("reportDate")+" "+fecha+"<br>"+tr("reportTime")+" "+hora+"</div></div>"+
-      "<div class=\"pp-summary\">"+
-      "<span>"+tr("reportTotal")+" <strong>"+total+"</strong></span>"+
-      "<span>"+tr("reportLow")+" <strong>"+low+"</strong></span>"+
-      "<span>"+tr("reportOut")+" <strong>"+out+"</strong></span></div>"+
-      "<table class=\"pp-table\"><thead><tr>"+
-      "<th>"+thP+"</th><th>"+thC+"</th><th>Stock</th><th>"+thD+"</th><th>"+thU+"</th><th>"+thSt+"</th>"+
-      "</tr></thead><tbody>"+emptyMsg+"</tbody></table>"+
-      "<div class=\"pp-footer\"><span>Afghan Kabob &amp; Grill &middot; "+invName+"</span><span>"+tr("ppLegend")+"</span></div>";
-  }
-
-  function getReportFilter() {
-    var sel = document.getElementById("reportFilter");
-    return sel ? sel.value : "todos";
-  }
-
-  function abrirVistaPrevia() {
-    document.getElementById("reportFilter").value = "todos";
-    document.getElementById("previewPage").innerHTML = buildReport("todos");
-    document.getElementById("printPreviewOverlay").classList.add("open");
-  }
-  function cerrarVistaPrevia() { document.getElementById("printPreviewOverlay").classList.remove("open"); }
-  /* printPreviewOverlay: NO cierra al hacer clic en el fondo — usar X */
-  function imprimirDesdePrevia() {
-    var pd = document.getElementById("printDoc");
-    pd.innerHTML = "<style>"+PCSS+"</style>"+buildReport(getReportFilter());
-    window.print();
-    setTimeout(function(){pd.innerHTML="";},1500);
-  }
-  function descargarPDF() {
-    var filtro = getReportFilter();
-    var loc    = lang==="es"?"es-MX":"en-US";
-    var fecha  = now.toLocaleDateString(loc,{day:"2-digit",month:"long",year:"numeric"}).replace(/\s/g,"_");
-    var key    = activeInv==="a"?"MP":"PT";
-    var sufijo = filtro==="bajo"?"_BajoStock":"";
-    var html   = "<!DOCTYPE html><html lang=\""+lang+"\"><head><meta charset=\"UTF-8\">"+
-      "<title>Afghan Kabob &amp; Grill - "+(activeInv==="a"?tr("invA"):tr("invB"))+"</title>"+
-      "<style>"+PCSS+"</style></head><body>"+buildReport(filtro)+"</body></html>";
-    var blob = new Blob([html],{type:"text/html;charset=utf-8"});
-    var url  = URL.createObjectURL(blob);
-    var a    = document.createElement("a");
-    a.href = url; a.download = "Inventario_"+key+sufijo+"_"+fecha+".html";
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){URL.revokeObjectURL(url);},5000);
-    toast(tr("toastPDF"));
+    return "<div class=\"pp-header\"><div>" +
+      "<div class=\"pp-logo-title\">Afghan Kabob &amp; Grill</div>" +
+      "<div class=\"pp-logo-sub\">" + tr("reportTitle") + "</div>" +
+      (filterLabel ? "<div class=\"pp-filter-label\">" + escapeHTML(filterLabel) + "</div>" : "") +
+      "<div class=\"pp-inv-type\" style=\"color:" + invColor + "\">" + invName + "</div></div>" +
+      "<div class=\"pp-meta\">" + tr("reportDate") + " " + fecha + "<br>" + tr("reportTime") + " " + hora + "</div></div>" +
+      "<div class=\"pp-summary\">" +
+      "<span>" + tr("reportTotal") + " <strong>" + total + "</strong></span>" +
+      "<span>" + tr("reportLow")   + " <strong>" + low   + "</strong></span>" +
+      "<span>" + tr("reportOut")   + " <strong>" + out   + "</strong></span></div>" +
+      "<div class=\"pp-table-wrap\"><table class=\"pp-table\"><thead><tr>" +
+      "<th>" + thP + "</th><th>" + thC + "</th><th>Stock</th><th>" + thD + "</th><th>" + thU + "</th><th>" + thSt + "</th>" +
+      "</tr></thead><tbody>" + emptyMsg + "</tbody></table></div>" +
+      "<div class=\"pp-footer\"><span>Afghan Kabob &amp; Grill &middot; " + invName + "</span><span>" + tr("ppLegend") + "</span></div>";
   }
   window.abrirVistaPrevia=abrirVistaPrevia; window.cerrarVistaPrevia=cerrarVistaPrevia;
   window.imprimirDesdePrevia=imprimirDesdePrevia; window.descargarPDF=descargarPDF;
+
+  /* Wire report filter changes */
+  var reportFilter = document.getElementById("reportFilter");
+  var reportSubcat = document.getElementById("reportSubcat");
+  var reportCat    = document.getElementById("reportCat");
+  if (reportFilter) { reportFilter.addEventListener("change", refreshReport); }
+  if (reportSubcat) { reportSubcat.addEventListener("change", refreshReport); }
+  if (reportCat)    { reportCat.addEventListener("change",    function() { document.getElementById("previewPage").innerHTML = buildReport(getReportFilters()); }); }
 
   /* ===== TOAST ===== */
   var toastTimer;

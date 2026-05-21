@@ -361,11 +361,26 @@
   <div class="print-preview-shell">
     <div class="preview-toolbar">
       <span class="preview-toolbar-title" id="hPreviewTitle">Vista previa</span>
-      <div class="preview-toolbar-actions">
+      <div class="preview-toolbar-filters">
+        <!-- Nivel 1: Contenido -->
         <select id="reportFilter" class="report-filter-select" aria-label="Filtrar informe">
           <option value="todos" id="rFilterAll">Todos los productos</option>
           <option value="bajo" id="rFilterLow">Solo bajo stock / agotados</option>
         </select>
+        <!-- Nivel 2: Almacenamiento -->
+        <select id="reportSubcat" class="report-filter-select" aria-label="Almacenamiento">
+          <option value="todos">Todo el almacenamiento</option>
+          <option value="congelados">🧊 Congelados</option>
+          <option value="refrigerados">❄️ Refrigerados</option>
+          <option value="secos">🌾 Secos</option>
+          <option value="limpieza">🧹 Limpieza</option>
+        </select>
+        <!-- Nivel 3: Categoría -->
+        <select id="reportCat" class="report-filter-select" aria-label="Categoria">
+          <option value="todos">Todas las categorias</option>
+        </select>
+      </div>
+      <div class="preview-toolbar-actions">
         <button type="button" class="btn-preview-close" id="hPreviewClose">Cerrar</button>
         <button type="button" class="btn-preview-pdf" id="hPreviewPDF">Descargar PDF</button>
         <button type="button" class="btn-preview-print" id="hPreviewPrint">Imprimir</button>
@@ -397,7 +412,7 @@
   <div class="login-bg">
     <div class="login-card">
       <div class="login-logo">Afghan Kabob &amp; Grill</div>
-      <div class="login-subtitle">Inventario</div>
+      <div class="login-subtitle">Inventory Management</div>
       <div class="login-form">
         <div class="form-group">
           <label for="loginUser">Usuario</label>
