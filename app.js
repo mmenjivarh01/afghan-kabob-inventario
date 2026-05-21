@@ -340,17 +340,16 @@
 
   /* Show/hide login screen */
   function showLogin() {
-    /* Hide loading overlay first */
     var lo = document.getElementById("loadingOverlay");
     if (lo) { lo.classList.add("hidden"); setTimeout(function(){ lo.style.display="none"; }, 400); }
     var ls = document.getElementById("loginScreen");
     if (ls) { ls.style.display = ""; }
-    var app = document.querySelector("header");
-    if (app) { app.style.display = "none"; }
+    var app = document.getElementById("appHeader");
+    if (app) { app.classList.add("hidden-initially"); app.style.display = "none"; }
     var nav = document.querySelector(".inv-switcher");
-    if (nav) { nav.style.display = "none"; }
+    if (nav) { nav.classList.add("hidden-initially"); nav.style.display = "none"; }
     var main = document.querySelector("main.container");
-    if (main) { main.style.display = "none"; }
+    if (main) { main.classList.add("hidden-initially"); main.style.display = "none"; }
     var gb = document.getElementById("guestBanner");
     if (gb) { gb.style.display = "none"; }
     /* Apply login labels in English */
@@ -374,12 +373,12 @@
   function hideLogin() {
     var ls = document.getElementById("loginScreen");
     if (ls) { ls.style.display = "none"; }
-    var app = document.querySelector("header");
-    if (app) { app.style.display = ""; }
+    var app = document.getElementById("appHeader");
+    if (app) { app.classList.remove("hidden-initially"); app.style.display = ""; }
     var nav = document.querySelector(".inv-switcher");
-    if (nav) { nav.style.display = ""; }
+    if (nav) { nav.classList.remove("hidden-initially"); nav.style.display = ""; }
     var main = document.querySelector("main.container");
-    if (main) { main.style.display = ""; }
+    if (main) { main.classList.remove("hidden-initially"); main.style.display = ""; }
   }
 
   /* Apply guest/user/admin mode to UI */

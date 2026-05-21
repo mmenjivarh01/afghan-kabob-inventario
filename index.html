@@ -84,7 +84,7 @@
 <body>
 
 <!-- ENCABEZADO -->
-<header role="banner">
+<header role="banner" class="hidden-initially" id="appHeader">
   <div class="logo">
     <span class="logo-title">Afghan Kabob &amp; Grill</span>
     <span class="logo-divider" aria-hidden="true"></span>
@@ -118,7 +118,7 @@
   <span>⏱ Tu sesión cerrará en <strong id="inactivityCountdown">60</strong> segundos por inactividad.</span>
   <button type="button" id="btnExtendSession" class="btn-extend">Extender sesión</button>
 </div>
-<nav class="inv-switcher" aria-label="Selector de inventario">
+<nav class="inv-switcher hidden-initially" aria-label="Selector de inventario">
   <button type="button" class="inv-tab active-a" id="tabA" aria-pressed="true">
     <span class="inv-tab-label" id="tabALabel">Inventario</span>
     <span class="inv-tab-name inv-accent-a" id="tabAName">Materia Prima</span>
@@ -130,7 +130,7 @@
 </nav>
 
 <!-- CONTENIDO PRINCIPAL -->
-<main class="container">
+<main class="container hidden-initially">
 
   <!-- Tarjetas de resumen -->
   <div class="stats-grid" role="region" aria-label="Resumen de inventario">
@@ -407,7 +407,7 @@
 </div>
 
 <!-- PANTALLA DE LOGIN -->
-<div id="loginScreen" class="hidden-initially">
+<div id="loginScreen">
   <div class="login-bg">
     <div class="login-card">
       <div class="login-logo">Afghan Kabob &amp; Grill</div>
