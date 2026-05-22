@@ -904,3 +904,10 @@ body.guest-mode .guest-banner {
   background: rgba(0,0,0,0.4); z-index: 450;
   -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
 }
+
+/* iOS ZOOM FIX — prevent Safari from zooming on input focus */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
