@@ -59,7 +59,9 @@
       rPreviewClose:"Cerrar", rPreviewPDF:"Descargar PDF", rPreviewPrint:"Imprimir",
       guestBanner:"👁 Modo Invitado — solo lectura",
       btnLogout:"↩ Cerrar sesión", btnChangePassLabel:"🔑 Cambiar contraseña",
-      btnAdminPanelLabel:"⚙️ Panel de Admin"
+      btnAdminPanelLabel:"⚙️ Panel de Admin",
+      histTitle:"🕐 Historial de cambios", histSubtitle:"Últimos 200 registros",
+      histFilterAll:"Todos", histFilterStock:"📦 Stock", histFilterEdit:"✏️ Ediciones"
     },
     en: {
       logoSub:"Inventory", btnLang:"ES", btnPrint:"Print / PDF", invLabel:"Inventory",
@@ -111,7 +113,9 @@
       rPreviewClose:"Close", rPreviewPDF:"Download PDF", rPreviewPrint:"Print",
       guestBanner:"👁 Guest mode — read only",
       btnLogout:"↩ Sign out", btnChangePassLabel:"🔑 Change password",
-      btnAdminPanelLabel:"⚙️ Admin panel"
+      btnAdminPanelLabel:"⚙️ Admin panel",
+      histTitle:"🕐 Change history", histSubtitle:"Last 200 records",
+      histFilterAll:"All", histFilterStock:"📦 Stock", histFilterEdit:"✏️ Edits"
     }
   };
 
@@ -1185,43 +1189,48 @@
     renderFilterBtns();
     render();
 
-    /* Translate report filter selects */
+    /* Translate report filter options */
     var rfa = document.getElementById("rFilterAll");
     if (rfa) { rfa.textContent = tr("rFilterAll"); }
     var rfl = document.getElementById("rFilterLow");
     if (rfl) { rfl.textContent = tr("rFilterLow"); }
 
-    /* Translate preview buttons */
-    var hPreviewClose = document.getElementById("hPreviewClose");
-    if (hPreviewClose) { hPreviewClose.textContent = tr("rPreviewClose"); }
-    var hPreviewPDF = document.getElementById("hPreviewPDF");
-    if (hPreviewPDF) { hPreviewPDF.textContent = tr("rPreviewPDF"); }
-    var hPreviewPrint = document.getElementById("hPreviewPrint");
-    if (hPreviewPrint) { hPreviewPrint.textContent = tr("rPreviewPrint"); }
-
-    /* Translate dropdown items */
-    var btnLogout = document.getElementById("btnLogout");
-    if (btnLogout) { btnLogout.textContent = tr("btnLogout"); }
-    var btnChangePass = document.getElementById("btnChangePass");
-    if (btnChangePass) { btnChangePass.textContent = tr("btnChangePassLabel"); }
-    var btnAdminPanel = document.getElementById("btnAdminPanel");
-    if (btnAdminPanel) { btnAdminPanel.textContent = tr("btnAdminPanelLabel"); }
-
-    /* Translate guest banner */
-    var gb = document.getElementById("guestBanner");
-    if (gb) { gb.textContent = tr("guestBanner"); }
-
-    /* Rebuild reportSubcat options with correct language */
+    /* Rebuild reportSubcat options in current language */
     var reportSubcat = document.getElementById("reportSubcat");
     if (reportSubcat) {
-      var currentSubcatVal = reportSubcat.value;
+      var currentVal = reportSubcat.value;
       var sh = "<option value=\"todos\">" + tr("rSubcatAll") + "</option>";
       SUBCATS.forEach(function(s) {
         sh += "<option value=\"" + s.id + "\">" + s.iconES + " " + (lang === "es" ? s.labelES : s.labelEN) + "</option>";
       });
       reportSubcat.innerHTML = sh;
-      reportSubcat.value = currentSubcatVal;
+      reportSubcat.value = currentVal;
     }
+
+    /* Translate dropdown items */
+    var btnLogoutEl = document.getElementById("btnLogout");
+    if (btnLogoutEl) { btnLogoutEl.textContent = tr("btnLogout"); }
+    var btnChangePassEl = document.getElementById("btnChangePass");
+    if (btnChangePassEl) { btnChangePassEl.textContent = tr("btnChangePassLabel"); }
+    var btnAdminPanelEl = document.getElementById("btnAdminPanel");
+    if (btnAdminPanelEl) { btnAdminPanelEl.textContent = tr("btnAdminPanelLabel"); }
+
+    /* Translate guest banner */
+    var gbEl = document.getElementById("guestBanner");
+    if (gbEl) { gbEl.textContent = tr("guestBanner"); }
+
+    /* Translate historial panel */
+    var histTitle = document.getElementById("historialTitle");
+    if (histTitle) { histTitle.textContent = tr("histTitle"); }
+    var histSubtitle = document.querySelector(".historial-subtitle");
+    if (histSubtitle) { histSubtitle.textContent = tr("histSubtitle"); }
+
+    /* Translate historial filter buttons */
+    document.querySelectorAll(".hist-filter-btn").forEach(function(btn) {
+      if (btn.dataset.filter === "todos")   { btn.textContent = tr("histFilterAll"); }
+      if (btn.dataset.filter === "stock")   { btn.textContent = tr("histFilterStock"); }
+      if (btn.dataset.filter === "edicion") { btn.textContent = tr("histFilterEdit"); }
+    });
   }
   function toggleLang() {
     lang = lang==="es"?"en":"es";
