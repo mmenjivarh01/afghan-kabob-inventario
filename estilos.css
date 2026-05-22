@@ -502,20 +502,49 @@ select option { background: var(--surface); color: var(--text); }
   .form-row { grid-template-columns: 1fr; gap: 0; }
   .adj-tab { font-size: 0.68rem; padding: 0.42rem 0.2rem; }
   #printPreviewOverlay { padding: 0; align-items: flex-start; }
-  .print-preview-shell { border-radius: 0; max-height: 100vh; }
-  .preview-toolbar { padding: 0.7rem 0.9rem; }
-  .preview-scroll { padding: 0.4rem; }
-  .preview-page { padding: 0.9rem; border-radius: 2px; font-size: 0.82rem; }
-  .preview-page .pp-logo-title { font-size: 1.2rem !important; }
-  .preview-page .pp-summary { flex-direction: column; gap: 0.2rem; font-size: 0.8rem; }
-  .preview-toolbar { flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 0.7rem 0.9rem; }
-  .preview-toolbar-filters { width: 100%; }
-  .preview-toolbar-filters select { font-size: 0.7rem; padding: 0.3rem 0.5rem; flex: 1; min-width: 0; }
-  .pp-header { flex-direction: column; gap: 0.4rem; align-items: flex-start; }
-  .pp-meta { text-align: left; }
-  .pp-summary { flex-wrap: wrap; gap: 0.5rem; }
-  .preview-toolbar-actions { gap: 0.35rem; }
+  .print-preview-shell { border-radius: 0; max-height: 100vh; height: 100vh; }
+
+  /* Toolbar — stack vertically on mobile */
+  .preview-toolbar { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.65rem 0.75rem; }
+  .preview-toolbar-title { font-size: 0.9rem; }
+  .preview-toolbar-filters {
+    width: 100%; display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.35rem;
+  }
+  .preview-toolbar-filters select {
+    font-size: clamp(0.6rem, 2.5vw, 0.73rem);
+    padding: 0.3rem 0.3rem;
+    min-width: 0; width: 100%;
+    text-overflow: ellipsis; overflow: hidden;
+  }
+  .preview-toolbar-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
   .btn-preview-close, .btn-preview-pdf, .btn-preview-print { font-size: 0.68rem; padding: 0.38rem 0.7rem; }
+
+  /* Report content — scale down for mobile */
+  .preview-scroll { padding: 0.35rem; }
+  .preview-page {
+    padding: 0.75rem 0.65rem;
+    border-radius: 2px;
+    font-size: clamp(0.7rem, 2.5vw, 0.82rem);
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .preview-page .pp-logo-title { font-size: clamp(1rem, 4vw, 1.4rem) !important; }
+  .preview-page .pp-summary { flex-direction: column; gap: 0.2rem; font-size: 0.78rem; }
+  .pp-header { flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+  .pp-meta { text-align: left; font-size: 0.72rem; }
+  .pp-summary { flex-wrap: wrap; gap: 0.5rem; }
+
+  /* Table — scale down and allow horizontal scroll */
+  .pp-table { font-size: clamp(0.6rem, 2vw, 0.82rem); }
+  .pp-table th { font-size: clamp(0.55rem, 1.8vw, 0.7rem); padding: 4px 5px; }
+  .pp-table td { padding: 4px 5px; font-size: clamp(0.6rem, 2vw, 0.8rem); }
+  .preview-page .pp-table-wrap { overflow-x: auto; width: 100%; }
+  .pp-filter-label { font-size: 0.7rem; }
+  .pp-inv-type { font-size: 0.9rem !important; }
 }
 @media (max-width: 400px) {
   .logo-title { font-size: clamp(0.7rem, 4.5vw, 0.95rem); }
