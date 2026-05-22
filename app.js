@@ -1333,6 +1333,11 @@
         if (typeof av==="string"){av=av.toLowerCase();bv=bv.toLowerCase();}
         return sortAsc?(av>bv?1:-1):(av<bv?1:-1);
       });
+    } else {
+      /* Default: sort by updatedAt ascending — oldest first, most recently updated last */
+      list = list.slice().sort(function(a,b) {
+        return (a.updatedAt || 0) - (b.updatedAt || 0);
+      });
     }
     return list;
   }
@@ -1522,7 +1527,8 @@
         id:parseInt(id,10), nombre:nombre,
         nombreES:nombreES, nombreEN:nombreEN,
         subcategoria:subcategoria,
-        categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo
+        categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo,
+        updatedAt: Date.now()
       };
       logAudit("✏️ Editado", nombre +
         (anterior.cantidad !== cantidad ? " | Stock: " + anterior.cantidad + " → " + cantidad + " " + unidad : "") +
@@ -1535,7 +1541,8 @@
         id:nextId(), nombre:nombre,
         nombreES:nombreES, nombreEN:nombreEN,
         subcategoria:subcategoria,
-        categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo
+        categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo,
+        updatedAt: Date.now()
       });
       logAudit("➕ Agregado", nombre + " | " + subcatLabel(subcategoria) + " / " + categoria + " | Stock inicial: " + cantidad + " " + unidad);
       toast(tr("toastAdded"));
@@ -1584,7 +1591,7 @@
     document.querySelectorAll(".adj-tab").forEach(function(t){t.classList.toggle("active",t.dataset.mode===mode);});
     var lbl={entrada:tr("adjLabelIn"),salida:tr("adjLabelOut"),directo:tr("adjLabelSet")};
     document.getElementById("adjLabel").textContent=lbl[mode];
-    document.getElementById("adjQty").value="";
+    /* Don't clear the value — user may have already typed the amount */
     updatePreview();
   }
   function updatePreview() {
@@ -1601,6 +1608,8 @@
     el.innerHTML=p.cantidad+" "+p.unidad+" &rarr; <span>"+Math.round(nuevo*100)/100+" "+p.unidad+"</span>";
   }
   function confirmarAjuste() {
+    /* Blur active input first to prevent scroll jump on mobile */
+    if (document.activeElement) { document.activeElement.blur(); }
     var p=ps().find(function(x){return x.id===adjId;});
     var qty=parseFloat(document.getElementById("adjQty").value);
     if (isNaN(qty)) { toast(tr("toastInvalid")); return; }
@@ -1611,6 +1620,7 @@
     else { nuevo=qty; }
     if (nuevo<0) { toast(tr("toastNegStock")); return; }
     p.cantidad=Math.round(nuevo*100)/100;
+    p.updatedAt = Date.now(); /* track last update time for sorting */
     var tipoAdj = adjMode==="entrada" ? "📦 Entrada" : adjMode==="salida" ? "📤 Salida" : "🔧 Ajuste directo";
     logAudit(tipoAdj, p.nombre + " | " + anterior + " → " + p.cantidad + " " + p.unidad);
     save(); render(); closeAdj();
