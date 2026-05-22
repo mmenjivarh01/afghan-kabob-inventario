@@ -1830,46 +1830,57 @@
     }
     list.innerHTML = h;
 
-    /* Edit button — switches row to edit mode */
+    /* Edit button — opens edit panel below list */
     list.querySelectorAll(".mgr-edit-btn").forEach(function(btn) {
       btn.addEventListener("click", function() {
-        var idx      = parseInt(btn.dataset.editidx, 10);
-        var c        = tempCats[idx];
-        var icon     = tempCatIcons[c] || "";
+        var idx       = parseInt(btn.dataset.editidx, 10);
+        var c         = tempCats[idx];
+        var icon      = tempCatIcons[c] || "";
         var otherName = lang === "es"
           ? (tempCatTrans[c] || "")
-          : (Object.keys(tempCatTrans).find(function(k){ return tempCatTrans[k] === c; }) ? tempCatTrans[Object.keys(tempCatTrans).find(function(k){ return tempCatTrans[k] === c; })] : "");
-        var row = btn.closest(".mgr-item-view");
-        var flagCurrent = lang === "es" ? "🇪🇸" : "🇬🇧";
-        var flagOther   = lang === "es" ? "🇬🇧" : "🇪🇸";
+          : (function(){ var r={}; Object.keys(tempCatTrans).forEach(function(k){ r[tempCatTrans[k]]=k; }); return r[c]||""; }());
+        var flagOther = lang === "es" ? "🇬🇧" : "🇪🇸";
         var placeholderOther = lang === "es" ? "English" : "Español";
+        var titleEdit = lang === "es" ? "Editar categoría" : "Edit category";
+        var lblCancel = lang === "es" ? "Cancelar" : "Cancel";
+        var lblSave   = lang === "es" ? "✓ Guardar" : "✓ Save";
 
-        row.classList.add("mgr-item-editing");
-        row.innerHTML =
-          "<input class=\"mgr-icon-input\" type=\"text\" value=\"" + escapeHTML(icon) + "\" data-iconidx=\"" + idx + "\" placeholder=\"🏷️\" maxlength=\"4\">" +
-          "<div class=\"mgr-dot\" style=\"background:" + PAL[idx % PAL.length].color + "\"></div>" +
-          "<div class=\"mgr-names\">" +
-            "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(c) + "\" data-idx=\"" + idx + "\" placeholder=\"" + flagCurrent + "\">" +
-            "<input class=\"mgr-input mgr-input-other\" type=\"text\" value=\"" + escapeHTML(otherName) + "\" data-otheridx=\"" + idx + "\" placeholder=\"" + flagOther + " " + placeholderOther + "\">" +
+        /* Remove existing panel */
+        var existing = list.parentNode.querySelector(".mgr-edit-panel");
+        if (existing) { existing.remove(); }
+        list.querySelectorAll(".mgr-item-view").forEach(function(r){ r.classList.remove("mgr-item-selected"); });
+        btn.closest(".mgr-item-view").classList.add("mgr-item-selected");
+
+        var panel = document.createElement("div");
+        panel.className = "mgr-edit-panel";
+        panel.innerHTML =
+          "<div class=\"mgr-edit-panel-title\">" + titleEdit + "</div>" +
+          "<div class=\"mgr-edit-row\">" +
+            "<input class=\"cat-icon-field\" type=\"text\" id=\"epIcon\" value=\"" + escapeHTML(icon) + "\" placeholder=\"🏷️\" maxlength=\"4\">" +
+            "<input class=\"mgr-edit-input\" type=\"text\" id=\"epName\" value=\"" + escapeHTML(c) + "\" placeholder=\"Nombre\">" +
           "</div>" +
-          "<button class=\"mgr-save-btn\" data-saveidx=\"" + idx + "\" title=\"Guardar\">✓</button>";
+          "<input class=\"mgr-edit-input\" type=\"text\" id=\"epOther\" value=\"" + escapeHTML(otherName) + "\" placeholder=\"" + flagOther + " " + placeholderOther + "\">" +
+          "<div class=\"mgr-edit-actions\">" +
+            "<button class=\"btn-cancel mgr-edit-cancel\">" + lblCancel + "</button>" +
+            "<button class=\"mgr-save-btn mgr-edit-save\">" + lblSave + "</button>" +
+          "</div>";
 
-        /* Save button */
-        row.querySelector(".mgr-save-btn").addEventListener("click", function() {
-          var newName  = row.querySelector(".mgr-input").value.trim();
-          var newOther = row.querySelector(".mgr-input-other").value.trim();
-          var newIcon  = row.querySelector(".mgr-icon-input").value.trim();
+        list.parentNode.insertBefore(panel, list.nextSibling);
+        document.getElementById("epName").focus();
+
+        panel.querySelector(".mgr-edit-cancel").addEventListener("click", function() {
+          panel.remove();
+          btn.closest(".mgr-item-view").classList.remove("mgr-item-selected");
+        });
+        panel.querySelector(".mgr-edit-save").addEventListener("click", function() {
+          var newName  = document.getElementById("epName").value.trim();
+          var newOther = document.getElementById("epOther").value.trim();
+          var newIcon  = document.getElementById("epIcon").value.trim();
           if (!newName) { return; }
-
           var oldName = tempCats[idx];
           tempCats[idx] = newName;
-
-          /* Update icon */
-          if (newIcon) { tempCatIcons[newName] = newIcon; }
-          else { delete tempCatIcons[newName]; }
+          if (newIcon) { tempCatIcons[newName] = newIcon; } else { delete tempCatIcons[newName]; }
           if (newName !== oldName) { delete tempCatIcons[oldName]; }
-
-          /* Update translation */
           var reverse2 = {};
           Object.keys(tempCatTrans).forEach(function(es) { reverse2[tempCatTrans[es]] = es; });
           if (lang === "es") {
@@ -1882,8 +1893,6 @@
           }
           renderCatMgrList();
         });
-
-        row.querySelector(".mgr-input").focus();
       });
     });
 
@@ -2065,22 +2074,38 @@
         var otherName = lang === "es"
           ? (tempUnitTrans[u] || "")
           : (function(){ var rev={}; Object.keys(tempUnitTrans).forEach(function(k){ rev[tempUnitTrans[k]]=k; }); return rev[u]||""; }());
-        var flagCurrent     = lang === "es" ? "🇪🇸" : "🇬🇧";
-        var flagOther       = lang === "es" ? "🇬🇧" : "🇪🇸";
+        var flagOther        = lang === "es" ? "🇬🇧" : "🇪🇸";
         var placeholderOther = lang === "es" ? "English" : "Español";
-        var row = btn.closest(".mgr-item-view");
-        row.classList.add("mgr-item-editing");
-        row.innerHTML =
-          "<div class=\"mgr-dot\" style=\"background:var(--gold)\"></div>" +
-          "<div class=\"mgr-names\">" +
-            "<input class=\"mgr-input\" type=\"text\" value=\"" + escapeHTML(u) + "\" data-idx=\"" + idx + "\" placeholder=\"" + flagCurrent + "\">" +
-            "<input class=\"mgr-input mgr-input-other\" type=\"text\" value=\"" + escapeHTML(otherName) + "\" data-otheridx=\"" + idx + "\" placeholder=\"" + flagOther + " " + placeholderOther + "\">" +
-          "</div>" +
-          "<button class=\"mgr-save-btn\" data-saveidx=\"" + idx + "\" title=\"Guardar\">✓</button>";
+        var titleEdit = lang === "es" ? "Editar unidad" : "Edit unit";
+        var lblCancel = lang === "es" ? "Cancelar" : "Cancel";
+        var lblSave   = lang === "es" ? "✓ Guardar" : "✓ Save";
 
-        row.querySelector(".mgr-save-btn").addEventListener("click", function() {
-          var newName  = row.querySelector(".mgr-input").value.trim();
-          var newOther = row.querySelector(".mgr-input-other").value.trim();
+        var existing = list.parentNode.querySelector(".mgr-edit-panel");
+        if (existing) { existing.remove(); }
+        list.querySelectorAll(".mgr-item-view").forEach(function(r){ r.classList.remove("mgr-item-selected"); });
+        btn.closest(".mgr-item-view").classList.add("mgr-item-selected");
+
+        var panel = document.createElement("div");
+        panel.className = "mgr-edit-panel";
+        panel.innerHTML =
+          "<div class=\"mgr-edit-panel-title\">" + titleEdit + "</div>" +
+          "<input class=\"mgr-edit-input\" type=\"text\" id=\"epUnitName\" value=\"" + escapeHTML(u) + "\" placeholder=\"Nombre\">" +
+          "<input class=\"mgr-edit-input\" type=\"text\" id=\"epUnitOther\" value=\"" + escapeHTML(otherName) + "\" placeholder=\"" + flagOther + " " + placeholderOther + "\">" +
+          "<div class=\"mgr-edit-actions\">" +
+            "<button class=\"btn-cancel mgr-edit-cancel\">" + lblCancel + "</button>" +
+            "<button class=\"mgr-save-btn mgr-edit-save\">" + lblSave + "</button>" +
+          "</div>";
+
+        list.parentNode.insertBefore(panel, list.nextSibling);
+        document.getElementById("epUnitName").focus();
+
+        panel.querySelector(".mgr-edit-cancel").addEventListener("click", function() {
+          panel.remove();
+          btn.closest(".mgr-item-view").classList.remove("mgr-item-selected");
+        });
+        panel.querySelector(".mgr-edit-save").addEventListener("click", function() {
+          var newName  = document.getElementById("epUnitName").value.trim();
+          var newOther = document.getElementById("epUnitOther").value.trim();
           if (!newName) { return; }
           var oldName = tempUnits[idx];
           tempUnits[idx] = newName;
@@ -2096,7 +2121,6 @@
           }
           renderUnitMgrList();
         });
-        row.querySelector(".mgr-input").focus();
       });
     });
 
