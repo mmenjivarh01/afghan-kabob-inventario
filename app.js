@@ -53,7 +53,13 @@
       gcDelMsg2NoUse:"Esta accion no se puede deshacer.",
       gcDelMsg2Use:"Los productos afectados seran reasignados. Esta accion no se puede deshacer.",
       lSubcat:"Almacenamiento", allSubcats:"Todo",
-      thSubcat:"Almacenamiento"
+      thSubcat:"Almacenamiento",
+      rFilterAll:"Todos los productos", rFilterLow:"Solo bajo stock / agotados",
+      rSubcatAll:"Todo el almacenamiento", rCatAll:"Todas las categorias",
+      rPreviewClose:"Cerrar", rPreviewPDF:"Descargar PDF", rPreviewPrint:"Imprimir",
+      guestBanner:"👁 Modo Invitado — solo lectura",
+      btnLogout:"↩ Cerrar sesión", btnChangePassLabel:"🔑 Cambiar contraseña",
+      btnAdminPanelLabel:"⚙️ Panel de Admin"
     },
     en: {
       logoSub:"Inventory", btnLang:"ES", btnPrint:"Print / PDF", invLabel:"Inventory",
@@ -99,7 +105,13 @@
       gcDelMsg2NoUse:"This action cannot be undone.",
       gcDelMsg2Use:"Affected products will be reassigned. This action cannot be undone.",
       lSubcat:"Storage type", allSubcats:"All",
-      thSubcat:"Storage"
+      thSubcat:"Storage",
+      rFilterAll:"All products", rFilterLow:"Low stock & out of stock only",
+      rSubcatAll:"All storage types", rCatAll:"All categories",
+      rPreviewClose:"Close", rPreviewPDF:"Download PDF", rPreviewPrint:"Print",
+      guestBanner:"👁 Guest mode — read only",
+      btnLogout:"↩ Sign out", btnChangePassLabel:"🔑 Change password",
+      btnAdminPanelLabel:"⚙️ Admin panel"
     }
   };
 
@@ -1172,6 +1184,44 @@
       now.toLocaleDateString(loc,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
     renderFilterBtns();
     render();
+
+    /* Translate report filter selects */
+    var rfa = document.getElementById("rFilterAll");
+    if (rfa) { rfa.textContent = tr("rFilterAll"); }
+    var rfl = document.getElementById("rFilterLow");
+    if (rfl) { rfl.textContent = tr("rFilterLow"); }
+
+    /* Translate preview buttons */
+    var hPreviewClose = document.getElementById("hPreviewClose");
+    if (hPreviewClose) { hPreviewClose.textContent = tr("rPreviewClose"); }
+    var hPreviewPDF = document.getElementById("hPreviewPDF");
+    if (hPreviewPDF) { hPreviewPDF.textContent = tr("rPreviewPDF"); }
+    var hPreviewPrint = document.getElementById("hPreviewPrint");
+    if (hPreviewPrint) { hPreviewPrint.textContent = tr("rPreviewPrint"); }
+
+    /* Translate dropdown items */
+    var btnLogout = document.getElementById("btnLogout");
+    if (btnLogout) { btnLogout.textContent = tr("btnLogout"); }
+    var btnChangePass = document.getElementById("btnChangePass");
+    if (btnChangePass) { btnChangePass.textContent = tr("btnChangePassLabel"); }
+    var btnAdminPanel = document.getElementById("btnAdminPanel");
+    if (btnAdminPanel) { btnAdminPanel.textContent = tr("btnAdminPanelLabel"); }
+
+    /* Translate guest banner */
+    var gb = document.getElementById("guestBanner");
+    if (gb) { gb.textContent = tr("guestBanner"); }
+
+    /* Rebuild reportSubcat options with correct language */
+    var reportSubcat = document.getElementById("reportSubcat");
+    if (reportSubcat) {
+      var currentSubcatVal = reportSubcat.value;
+      var sh = "<option value=\"todos\">" + tr("rSubcatAll") + "</option>";
+      SUBCATS.forEach(function(s) {
+        sh += "<option value=\"" + s.id + "\">" + s.iconES + " " + (lang === "es" ? s.labelES : s.labelEN) + "</option>";
+      });
+      reportSubcat.innerHTML = sh;
+      reportSubcat.value = currentSubcatVal;
+    }
   }
   function toggleLang() {
     lang = lang==="es"?"en":"es";
@@ -2152,8 +2202,7 @@
       if (filtered.some(function(p){ return p.categoria === c; })) { cats.push(c); }
     });
 
-    var loc = lang === "es" ? "Todas las categorias" : "All categories";
-    var h   = "<option value=\"todos\">" + loc + "</option>";
+    var h = "<option value=\"todos\">" + tr("rCatAll") + "</option>";
     cats.forEach(function(c) {
       var icon = catIcon(c);
       h += "<option value=\"" + escapeHTML(c) + "\">" + (icon ? icon + " " : "") + escapeHTML(c) + "</option>";
@@ -2168,11 +2217,23 @@
   }
 
   function abrirVistaPrevia() {
-    /* Reset filters */
+    /* Rebuild subcat options in current language */
+    var reportSubcat = document.getElementById("reportSubcat");
+    if (reportSubcat) {
+      var sh = "<option value=\"todos\">" + tr("rSubcatAll") + "</option>";
+      SUBCATS.forEach(function(s) {
+        sh += "<option value=\"" + s.id + "\">" + s.iconES + " " + (lang === "es" ? s.labelES : s.labelEN) + "</option>";
+      });
+      reportSubcat.innerHTML = sh;
+    }
+    /* Reset cat options */
+    var reportCat = document.getElementById("reportCat");
+    if (reportCat) {
+      reportCat.innerHTML = "<option value=\"todos\">" + tr("rCatAll") + "</option>";
+    }
     document.getElementById("reportFilter").value = "todos";
     document.getElementById("reportSubcat").value = "todos";
     updateReportCatSelect();
-    document.getElementById("reportCat").value = "todos";
     document.getElementById("previewPage").innerHTML = buildReport({ content:"todos", subcat:"todos", cat:"todos" });
     document.getElementById("printPreviewOverlay").classList.add("open");
   }
