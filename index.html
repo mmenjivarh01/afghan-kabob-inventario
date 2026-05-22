@@ -525,6 +525,30 @@
   <!-- SortableJS — drag & drop compatible con iOS Safari -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
+  <!-- iOS zoom prevention — must run before any input focus -->
+  <script>
+  (function() {
+    var metaViewport = document.querySelector('meta[name="viewport"]');
+    function disableZoom() {
+      metaViewport.setAttribute('content',
+        'width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no');
+    }
+    function enableZoom() {
+      metaViewport.setAttribute('content',
+        'width=device-width, initial-scale=1.0, viewport-fit=cover');
+    }
+    document.addEventListener('focusin', function(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+        disableZoom();
+      }
+    }, true);
+    document.addEventListener('focusout', function(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+        setTimeout(enableZoom, 300);
+      }
+    }, true);
+  })();
+  </script>
   <!-- Logica de la aplicacion -->
   <script src="app.js"></script>
 
