@@ -1434,7 +1434,7 @@
       h+="</div></td>";
       h+="<td class=\"mono-cell\">"+escapeHTML(p.minimo)+"</td>";
       h+="<td class=\"mono-cell diff-cell "+diffClass+"\">"+diffSign+diff+"</td>";
-      h+="<td class=\"mono-cell small-cell\">"+escapeHTML(p.unidad)+"</td>";
+      h+="<td class=\"mono-cell small-cell\">"+escapeHTML(displayUnit(p.unidad))+"</td>";
       h+="<td>"+statusEl(st)+"</td>";
       h+="<td>";
       h+="<button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
@@ -1473,9 +1473,9 @@
       h+="<span class=\"drag-handle-card\" title=\""+(lang==="es"?"Arrastrar":"Drag")+"\">&#8597;</span>";
       h+="</div></div>";
       h+="<div class=\"card-body\">";
-      h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblS+"</span><span class=\"card-field-value "+st+"-color\">"+p.cantidad+" "+p.unidad+"</span></div>";
-      h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblM+"</span><span class=\"card-field-value\" style=\"color:var(--muted)\">"+p.minimo+" "+p.unidad+"</span></div>";
-      h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblDiff+"</span><span class=\"card-field-value "+diffClass+"\">"+diffSign+diff+" "+p.unidad+"</span></div>";
+      h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblS+"</span><span class=\"card-field-value "+st+"-color\">"+p.cantidad+" "+displayUnit(p.unidad)+"</span></div>";
+      h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblM+"</span><span class=\"card-field-value\" style=\"color:var(--muted)\">"+p.minimo+" "+displayUnit(p.unidad)+"</span></div>";
+      h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblDiff+"</span><span class=\"card-field-value "+diffClass+"\">"+diffSign+diff+" "+displayUnit(p.unidad)+"</span></div>";
       h+="</div>";
       h+="<div class=\"card-actions\">";
             h+="<button class=\"card-btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">&#9881; "+(lang==="es"?"Ajustar":"Adjust")+"</button>";
@@ -1641,7 +1641,7 @@
     adjId=id; adjMode="entrada";
     var p=ps().find(function(x){return x.id===id;});
     document.getElementById("adjName").textContent = escapeHTML(p.nombre);
-    document.getElementById("adjCurrent").textContent = tr("adjCurrent")+" "+escapeHTML(p.cantidad)+" "+escapeHTML(p.unidad);
+    document.getElementById("adjCurrent").textContent = tr("adjCurrent")+" "+escapeHTML(p.cantidad)+" "+escapeHTML(displayUnit(p.unidad));
     document.getElementById("adjQty").value="";
     document.getElementById("adjPreview").textContent=tr("adjPrompt");
     setAdjMode("entrada");
@@ -1669,7 +1669,7 @@
     else if (adjMode==="salida") { nuevo=p.cantidad-qty; }
     else { nuevo=qty; }
     if (nuevo<0) { el.textContent=tr("adjNegErr"); return; }
-    el.innerHTML=p.cantidad+" "+p.unidad+" &rarr; <span>"+Math.round(nuevo*100)/100+" "+p.unidad+"</span>";
+    el.innerHTML=p.cantidad+" "+displayUnit(p.unidad)+" &rarr; <span>"+Math.round(nuevo*100)/100+" "+displayUnit(p.unidad)+"</span>";
   }
   function confirmarAjuste() {
     /* Blur active input first to prevent scroll jump on mobile */
@@ -1688,7 +1688,7 @@
     var tipoAdj = adjMode==="entrada" ? "📦 Entrada" : adjMode==="salida" ? "📤 Salida" : "🔧 Ajuste directo";
     logAudit(tipoAdj, p.nombre + " | " + anterior + " → " + p.cantidad + " " + p.unidad);
     save(); render(); closeAdj();
-    toast('"'+escapeHTML(p.nombre)+'": '+escapeHTML(p.cantidad)+" "+escapeHTML(p.unidad));
+    toast('"'+escapeHTML(p.nombre)+'": '+escapeHTML(p.cantidad)+" "+escapeHTML(displayUnit(p.unidad)));
   }
   window.openAdj=openAdj; window.closeAdj=closeAdj;
   window.setAdjMode=setAdjMode; window.updatePreview=updatePreview; window.confirmarAjuste=confirmarAjuste;
@@ -1724,10 +1724,18 @@
   var catIconsCache  = { a: {}, b: {} }; /* { "Carnes": "🥩", "Verduras": "🥦" } */
   function loadCatTrans(inv)  { return catTransCache[inv]  || {}; }
   function loadCatIcons(inv)  { return catIconsCache[inv]  || {}; }
+  function displayUnit(unit) {
+    if (!unit) { return ""; }
+    var trans   = loadUnitTrans(activeInv);
+    var reverse = {};
+    Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
+    if (lang === "en" && trans[unit])   { return trans[unit]; }
+    if (lang === "es" && reverse[unit]) { return reverse[unit]; }
+    return unit;
+  }
   function catIcon(cat) {
     var icons = loadCatIcons(activeInv);
     if (icons[cat]) { return icons[cat]; }
-    /* Try the other-language equivalent */
     var trans   = loadCatTrans(activeInv);
     var reverse = {};
     Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
@@ -2334,7 +2342,7 @@
       rows += "<td><span class=\"pp-badge\">" + escapeHTML(x.categoria) + "</span></td>";
       rows += "<td><strong>" + x.cantidad + "</strong></td>";
       rows += "<td style=\"" + diffStyle + "\">" + diffSign + diff + "</td>";
-      rows += "<td>" + escapeHTML(x.unidad) + "</td>";
+      rows += "<td>" + escapeHTML(displayUnit(x.unidad)) + "</td>";
       rows += "<td class=\"" + stC + "\">" + stL + "</td>";
       rows += "</tr>";
     });
