@@ -470,7 +470,17 @@ select option { background: var(--surface); color: var(--text); }
 .loading-text { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); letter-spacing: 0.08em; }
 
 /* REPORT FILTER */
-.report-filter-select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 0.38rem 0.7rem; border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 0.73rem; cursor: pointer; outline: none; transition: border-color 0.15s; appearance: none; }
+.report-filter-select {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  padding: 0.38rem 0.5rem; border-radius: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: clamp(0.6rem, 1.8vw, 0.73rem);
+  cursor: pointer; outline: none; transition: border-color 0.15s;
+  appearance: none; -webkit-appearance: none;
+  width: 100%; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  box-sizing: border-box;
+}
 .report-filter-select:focus { border-color: var(--gold); }
 
 /* RESPONSIVE */
@@ -505,18 +515,18 @@ select option { background: var(--surface); color: var(--text); }
   .print-preview-shell { border-radius: 0; max-height: 100vh; height: 100vh; }
 
   /* Toolbar — stack vertically on mobile */
-  .preview-toolbar { flex-direction: column; align-items: stretch; gap: 0.5rem; padding: 0.65rem 0.75rem; }
-  .preview-toolbar-title { font-size: 0.9rem; }
+  .preview-toolbar { flex-direction: column; align-items: stretch; gap: 0.4rem; padding: 0.6rem 0.75rem; }
+  .preview-toolbar-title { font-size: 0.85rem; }
   .preview-toolbar-filters {
-    width: 100%; display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 0.35rem;
+    width: 100%; display: flex;
+    flex-direction: column; gap: 0.3rem;
   }
   .preview-toolbar-filters select {
-    font-size: clamp(0.6rem, 2.5vw, 0.73rem);
-    padding: 0.3rem 0.3rem;
-    min-width: 0; width: 100%;
-    text-overflow: ellipsis; overflow: hidden;
+    font-size: 16px;
+    padding: 0.45rem 0.5rem;
+    width: 100%; min-width: 0;
+    border-radius: var(--radius-sm);
+    box-sizing: border-box;
   }
   .preview-toolbar-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
   .btn-preview-close, .btn-preview-pdf, .btn-preview-print { font-size: 0.68rem; padding: 0.38rem 0.7rem; }
