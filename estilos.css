@@ -39,7 +39,7 @@
   color-scheme: light;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-input, select, textarea { color-scheme: light; }
+input, select, textarea { color-scheme: light; font-size: 16px; }
 input:not([type="range"]), select, textarea { background-color: var(--bg) !important; color: var(--text) !important; }
 html { font-size: 16px; color-scheme: light; background: var(--bg); overflow-x: hidden; }
 body { background: var(--bg) !important; color: var(--text) !important; font-family: 'DM Sans', sans-serif; min-height: 100vh; color-scheme: light; overflow-x: hidden; }
