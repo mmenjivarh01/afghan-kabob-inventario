@@ -600,7 +600,12 @@
   function toggleUserDropdown() {
     var dd = document.getElementById("userDropdown");
     dropdownOpen = !dropdownOpen;
-    dd.style.display = dropdownOpen ? "" : "none";
+    if (dropdownOpen) {
+      dd.classList.remove("hidden-initially");
+      dd.style.display = "";
+    } else {
+      dd.style.display = "none";
+    }
   }
   function closeUserDropdown() {
     var dd = document.getElementById("userDropdown");
