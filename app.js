@@ -422,7 +422,14 @@
     if (hb) { hb.style.display = isGuest ? "none" : ""; }
     /* Admin panel button in dropdown */
     var ap = document.getElementById("btnAdminPanel");
-    if (ap) { ap.style.display = currentUser && currentUser.role === "admin" ? "" : "none"; }
+    if (ap) {
+      if (currentUser && currentUser.role === "admin") {
+        ap.classList.remove("hidden-initially");
+        ap.style.display = "";
+      } else {
+        ap.style.display = "none";
+      }
+    }
     /* Change password button — hide for guest */
     var cp = document.getElementById("btnChangePass");
     if (cp) { cp.style.display = isGuest ? "none" : ""; }
@@ -524,6 +531,7 @@
   function onLoginSuccess() {
     hideLogin();
     applyUserMode();
+    applyLang(); /* Apply correct language immediately */
     if (!isGuest) { resetInactivityTimer(); }
     if (!authReady) {
       authReady = true;
@@ -962,13 +970,7 @@
     });
   }
 
-  /* Save cat/unit translations to Firebase */
-  function saveCatTransFB(inv, map) {
-    if (!db) { return; }
-    db.ref("inventario/" + inv + "/cattrans").set(map).catch(function(e) {
-      console.error("[Inventario] Error guardando traducciones de categorias:", e);
-    });
-  }
+  /* Save unit translations to Firebase */
   function saveUnitTransFB(inv, map) {
     if (!db) { return; }
     db.ref("inventario/" + inv + "/unittrans").set(map).catch(function(e) {
@@ -993,7 +995,7 @@
     function checkAllLoaded() {
       if (loaded.a && loaded.b) {
         fullyLoaded = true;
-        render();
+        applyLang(); /* re-apply language after data is loaded to translate everything */
         hideLoading();
       }
     }
@@ -1064,6 +1066,28 @@
         if (data.cattrans)  { catTransCache[inv]  = data.cattrans; }
         if (data.unittrans) { unitTransCache[inv] = data.unittrans; }
         if (data.caticons)  { catIconsCache[inv]  = data.caticons; }
+
+        /* Normalize: if any category/unit is stored in English, convert to Spanish */
+        var ctrans = catTransCache[inv] || {};
+        var utrans = unitTransCache[inv] || {};
+        var ctransReverse = {};
+        Object.keys(ctrans).forEach(function(es) { ctransReverse[ctrans[es].toLowerCase()] = es; });
+        var utransReverse = {};
+        Object.keys(utrans).forEach(function(es) { utransReverse[utrans[es].toLowerCase()] = es; });
+
+        /* Normalize categories — if stored in English, swap to Spanish */
+        state[inv].categorias = state[inv].categorias.map(function(c) {
+          return ctransReverse[c.toLowerCase()] || c;
+        });
+        /* Normalize units — if stored in English, swap to Spanish */
+        state[inv].unidades = state[inv].unidades.map(function(u) {
+          return utransReverse[u.toLowerCase()] || u;
+        });
+        /* Normalize product categories and units */
+        state[inv].productos.forEach(function(p) {
+          if (p.categoria && ctransReverse[p.categoria.toLowerCase()]) { p.categoria = ctransReverse[p.categoria.toLowerCase()]; }
+          if (p.unidad    && utransReverse[p.unidad.toLowerCase()])    { p.unidad    = utransReverse[p.unidad.toLowerCase()]; }
+        });
 
         if (!loaded[inv]) {
           loaded[inv] = true;
@@ -1178,8 +1202,8 @@
     /* Update report filter options */
     var rAll = document.getElementById("rFilterAll");
     var rLow = document.getElementById("rFilterLow");
-    if (rAll) { rAll.textContent = lang==="es" ? "Todos los productos" : "All products"; }
-    if (rLow) { rLow.textContent = lang==="es" ? "Solo bajo stock / agotados" : "Low stock / out of stock only"; }
+    if (rAll) { rAll.textContent = tr("rFilterAll"); }
+    if (rLow) { rLow.textContent = tr("rFilterLow"); }
     /* Update aria-labels that contain translatable text */
     var btnPrint = document.getElementById("btnPrint");
     if (btnPrint) { btnPrint.setAttribute("aria-label", tr("btnPrint")); }
@@ -1188,12 +1212,6 @@
       now.toLocaleDateString(loc,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
     renderFilterBtns();
     render();
-
-    /* Translate report filter options */
-    var rfa = document.getElementById("rFilterAll");
-    if (rfa) { rfa.textContent = tr("rFilterAll"); }
-    var rfl = document.getElementById("rFilterLow");
-    if (rfl) { rfl.textContent = tr("rFilterLow"); }
 
     /* Rebuild reportSubcat options in current language */
     var reportSubcat = document.getElementById("reportSubcat");
@@ -1356,7 +1374,7 @@
     catsInView.forEach(function(c) {
       var isActive = filterCats.indexOf(c) >= 0;
       var icon = catIcon(c);
-      h += "<button class=\"filter-btn" + (isActive ? " active" : "") + "\" data-cat=\"" + escapeHTML(c) + "\">" + (icon ? icon + " " : "") + escapeHTML(c) + "</button>";
+      h += "<button class=\"filter-btn" + (isActive ? " active" : "") + "\" data-cat=\"" + escapeHTML(c) + "\">" + (icon ? icon + " " : "") + escapeHTML(displayCat(c)) + "</button>";
     });
     wrap.innerHTML = h;
 
@@ -1388,7 +1406,7 @@
       var matchSubcat = filterSubcat === "todos" || p.subcategoria === filterSubcat;
       var matchCat    = filterCats.length === 0 || filterCats.indexOf(p.categoria) >= 0;
       var matchStatus = filterStatus === "todos" || st === filterStatus;
-      var matchSearch = p.nombre.toLowerCase().indexOf(q) >= 0;
+      var matchSearch = displayName(p).toLowerCase().indexOf(q) >= 0;
       return matchSubcat && matchCat && matchStatus && matchSearch;
     });
     if (sortField) {
@@ -1420,12 +1438,12 @@
       var diffClass = diff > 0 ? "ok-color" : diff === 0 ? "" : "danger-color";
       h+="<tr class=\"draggable-row\">";
       h+="<td class=\"drag-handle\" title=\""+(lang==="es"?"Arrastrar para reordenar":"Drag to reorder")+"\">&#8597;</td>";
-      h+="<td><strong>"+escapeHTML(p.nombre)+"</strong></td>";
+      h+="<td><strong>"+escapeHTML(displayName(p))+"</strong></td>";
       h+="<td><div class=\"cat-cell\">";
       if (p.subcategoria) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(subcatLabel(p.subcategoria))+"\">"+subcatIcon(p.subcategoria)+"</span>"; }
       var cIcon = catIcon(p.categoria);
-      if (cIcon) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(p.categoria)+"\">"+cIcon+"</span>"; }
-      else { h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(p.categoria)+"</span>"; }
+      if (cIcon) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(displayCat(p.categoria))+"\">"+cIcon+"</span>"; }
+      else { h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(displayCat(p.categoria))+"</span>"; }
       h+="</div></td>";
       h+="<td><div class=\"stock-cell\">";
       h+="<div class=\"bar-bg\"><div class=\"bar-fill\" style=\"width:"+pct+"%;background:"+barClr(st)+"\"></div></div>";
@@ -1460,12 +1478,12 @@
       h+="<div class=\"inv-card\">";
       h+="<div class=\"card-header\">";
       h+="<div>";
-      h+="<div class=\"card-name\">"+escapeHTML(p.nombre)+"</div>";
+      h+="<div class=\"card-name\">"+escapeHTML(displayName(p))+"</div>";
       h+="<div class=\"cat-cell\" style=\"margin-top:0.3rem\">";
       if (p.subcategoria) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(subcatLabel(p.subcategoria))+"\">"+subcatIcon(p.subcategoria)+"</span>"; }
       var cIcon = catIcon(p.categoria);
-      if (cIcon) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(p.categoria)+"\">"+cIcon+"</span>"; }
-      else { h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(p.categoria)+"</span>"; }
+      if (cIcon) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(displayCat(p.categoria))+"\">"+cIcon+"</span>"; }
+      else { h+="<span class=\"cat-badge\" style=\""+catStyle(p.categoria)+"\">"+escapeHTML(displayCat(p.categoria))+"</span>"; }
       h+="</div>";
       h+="</div>";
       h+="<div style=\"display:flex;align-items:center;gap:0.5rem;\">";
@@ -1621,17 +1639,17 @@
   function abrirDelModal(id) {
     pendingDel=id;
     var p=ps().find(function(x){return x.id===id;});
-    document.getElementById("delProductName").textContent = '"'+escapeHTML(p.nombre)+'"?';
+    document.getElementById("delProductName").textContent = '"'+escapeHTML(displayName(p))+'"?';
     document.getElementById("delOverlay").classList.add("open");
   }
   function closeDelModal() { document.getElementById("delOverlay").classList.remove("open"); pendingDel=null; }
   function confirmarEliminar() {
     if (pendingDel===null) { return; }
     var p=ps().find(function(x){return x.id===pendingDel;});
-    logAudit("🗑️ Eliminado", p.nombre + " | " + (p.categoria||"") + " | Stock al eliminar: " + p.cantidad + " " + p.unidad);
+    logAudit("🗑️ Eliminado", displayName(p) + " | " + (p.categoria||"") + " | Stock al eliminar: " + p.cantidad + " " + p.unidad);
     S().productos=S().productos.filter(function(x){return x.id!==pendingDel;});
     save(); render(); closeDelModal();
-    toast('"'+escapeHTML(p.nombre)+'" '+tr("toastDeleted"));
+    toast('"'+escapeHTML(displayName(p))+'" '+tr("toastDeleted"));
   }
   document.getElementById("delOverlay").addEventListener("click",function(e){if(e.target===e.currentTarget){closeDelModal();}});
   window.abrirDelModal=abrirDelModal; window.closeDelModal=closeDelModal; window.confirmarEliminar=confirmarEliminar;
@@ -1640,7 +1658,7 @@
   function openAdj(id) {
     adjId=id; adjMode="entrada";
     var p=ps().find(function(x){return x.id===id;});
-    document.getElementById("adjName").textContent = escapeHTML(p.nombre);
+    document.getElementById("adjName").textContent = escapeHTML(displayName(p));
     document.getElementById("adjCurrent").textContent = tr("adjCurrent")+" "+escapeHTML(p.cantidad)+" "+escapeHTML(displayUnit(p.unidad));
     document.getElementById("adjQty").value="";
     document.getElementById("adjPreview").textContent=tr("adjPrompt");
@@ -1686,9 +1704,9 @@
     p.cantidad=Math.round(nuevo*100)/100;
     p.updatedAt = Date.now(); /* track last update time for sorting */
     var tipoAdj = adjMode==="entrada" ? "📦 Entrada" : adjMode==="salida" ? "📤 Salida" : "🔧 Ajuste directo";
-    logAudit(tipoAdj, p.nombre + " | " + anterior + " → " + p.cantidad + " " + p.unidad);
+    logAudit(tipoAdj, displayName(p) + " | " + anterior + " → " + p.cantidad + " " + p.unidad);
     save(); render(); closeAdj();
-    toast('"'+escapeHTML(p.nombre)+'": '+escapeHTML(p.cantidad)+" "+escapeHTML(displayUnit(p.unidad)));
+    toast('"'+escapeHTML(displayName(p))+'": '+escapeHTML(p.cantidad)+" "+escapeHTML(displayUnit(p.unidad)));
   }
   window.openAdj=openAdj; window.closeAdj=closeAdj;
   window.setAdjMode=setAdjMode; window.updatePreview=updatePreview; window.confirmarAjuste=confirmarAjuste;
@@ -1724,6 +1742,13 @@
   var catIconsCache  = { a: {}, b: {} }; /* { "Carnes": "🥩", "Verduras": "🥦" } */
   function loadCatTrans(inv)  { return catTransCache[inv]  || {}; }
   function loadCatIcons(inv)  { return catIconsCache[inv]  || {}; }
+  function displayName(p) {
+    if (!p) { return ""; }
+    if (lang === "es" && p.nombreES) { return p.nombreES; }
+    if (lang === "en" && p.nombreEN) { return p.nombreEN; }
+    return p.nombre || "";
+  }
+
   function displayUnit(unit) {
     if (!unit) { return ""; }
     var trans   = loadUnitTrans(activeInv);
@@ -1732,6 +1757,16 @@
     if (lang === "en" && trans[unit])   { return trans[unit]; }
     if (lang === "es" && reverse[unit]) { return reverse[unit]; }
     return unit;
+  }
+
+  function displayCat(cat) {
+    if (!cat) { return ""; }
+    var trans   = loadCatTrans(activeInv);
+    var reverse = {};
+    Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
+    if (lang === "en" && trans[cat])   { return trans[cat]; }
+    if (lang === "es" && reverse[cat]) { return reverse[cat]; }
+    return cat;
   }
   function catIcon(cat) {
     var icons = loadCatIcons(activeInv);
@@ -1742,12 +1777,6 @@
     var other = trans[cat] || reverse[cat];
     if (other && icons[other]) { return icons[other]; }
     return "";
-  }
-  function saveCatIconsFB(inv, map) {
-    if (!db) { return; }
-    db.ref("inventario/" + inv + "/caticons").set(map).catch(function(e) {
-      console.error("[Inventario] Error guardando iconos de categorias:", e);
-    });
   }
 
   /* On language switch, apply user-category translations */
@@ -1780,8 +1809,22 @@
   var tempCatIcons = {};
 
   function openCatMgr() {
-    tempCats     = cs().slice();
-    tempCatTrans = loadCatTrans(activeInv);
+    tempCats = cs().slice();
+    /* Normalize tempCatTrans to always be ES→EN */
+    var rawTrans = loadCatTrans(activeInv);
+    var normalizedTrans = {};
+    var tempCatsLower = tempCats.map(function(c) { return c.toLowerCase(); });
+    Object.keys(rawTrans).forEach(function(k) {
+      var v = rawTrans[k];
+      var isKeyES = tempCatsLower.indexOf(k.toLowerCase()) >= 0;
+      if (isKeyES) {
+        normalizedTrans[k] = v; /* already ES→EN */
+      } else {
+        /* k is EN, v is ES — swap to ES→EN */
+        if (v) { normalizedTrans[v] = k; }
+      }
+    });
+    tempCatTrans = normalizedTrans;
     tempCatIcons = Object.assign({}, loadCatIcons(activeInv));
     renderCatMgrList();
     var iconEl = document.getElementById("catNewIcon");
@@ -1861,7 +1904,7 @@
           "</div>" +
           "<input class=\"mgr-edit-input\" type=\"text\" id=\"epOther\" value=\"" + escapeHTML(otherName) + "\" placeholder=\"" + flagOther + " " + placeholderOther + "\">" +
           "<div class=\"mgr-edit-actions\">" +
-            "<button class=\"btn-cancel mgr-edit-cancel\">" + lblCancel + "</button>" +
+            "<button class=\"mgr-edit-cancel\">" + lblCancel + "</button>" +
             "<button class=\"mgr-save-btn mgr-edit-save\">" + lblSave + "</button>" +
           "</div>";
 
@@ -1878,19 +1921,32 @@
           var newIcon  = document.getElementById("epIcon").value.trim();
           if (!newName) { return; }
           var oldName = tempCats[idx];
-          tempCats[idx] = newName;
-          if (newIcon) { tempCatIcons[newName] = newIcon; } else { delete tempCatIcons[newName]; }
-          if (newName !== oldName) { delete tempCatIcons[oldName]; }
+
+          /* Always normalize to Spanish as primary key */
+          var newES, newEN;
+          if (lang === "es") {
+            newES = newName;
+            newEN = newOther;
+          } else {
+            newES = newOther || newName; /* if no Spanish provided, use English as fallback */
+            newEN = newName;
+          }
+          if (!newES) { newES = newEN; }
+
+          /* Update primary key in tempCats */
+          tempCats[idx] = newES;
+
+          /* Update icon — keyed by Spanish */
           var reverse2 = {};
           Object.keys(tempCatTrans).forEach(function(es) { reverse2[tempCatTrans[es]] = es; });
-          if (lang === "es") {
-            delete tempCatTrans[oldName];
-            if (newOther) { tempCatTrans[newName] = newOther; }
-          } else {
-            var oldES = reverse2[oldName] || oldName;
-            delete tempCatTrans[oldES];
-            if (newOther) { tempCatTrans[newOther] = newName; }
-          }
+          var oldES = (reverse2[oldName] || oldName);
+          if (newIcon) { tempCatIcons[newES] = newIcon; } else { delete tempCatIcons[newES]; }
+          if (newES !== oldES) { delete tempCatIcons[oldES]; }
+
+          /* Update translation — always ES → EN */
+          delete tempCatTrans[oldES];
+          if (newEN && newEN !== newES) { tempCatTrans[newES] = newEN; }
+
           renderCatMgrList();
         });
       });
@@ -1931,21 +1987,28 @@
     var icon     = iconEl ? iconEl.value.trim() : "";
     var nameES   = document.getElementById("catNewNameES").value.trim();
     var nameEN   = document.getElementById("catNewNameEN").value.trim();
+
+    /* Require at least the current language name */
     var nameActive = lang === "es" ? nameES : nameEN;
     if (!nameActive) {
       document.getElementById(lang === "es" ? "catNewNameES" : "catNewNameEN").focus();
       return;
     }
+
+    /* If only one language filled, use it as fallback for both */
     if (!nameES) { nameES = nameEN; }
     if (!nameEN) { nameEN = nameES; }
 
-    var exists = tempCats.some(function(c) { return c.toLowerCase() === nameActive.toLowerCase(); });
+    /* Always store Spanish as primary key */
+    var primaryKey = nameES;
+
+    var exists = tempCats.some(function(c) { return c.toLowerCase() === primaryKey.toLowerCase(); });
     if (exists) { toast(tr("toastCatExists")); return; }
 
-    tempCats.push(nameActive);
-    if (icon) { tempCatIcons[nameActive] = icon; }
+    tempCats.push(primaryKey);
+    if (icon) { tempCatIcons[primaryKey] = icon; }
     if (nameES !== nameEN) {
-      tempCatTrans[nameES] = nameEN;
+      tempCatTrans[nameES] = nameEN; /* always ES → EN */
     }
     if (iconEl) { iconEl.value = ""; }
     document.getElementById("catNewNameES").value = "";
@@ -2025,8 +2088,21 @@
   }
 
   function openUnitMgr() {
-    tempUnits     = us().slice();
-    tempUnitTrans = loadUnitTrans(activeInv);
+    tempUnits = us().slice();
+    /* Normalize tempUnitTrans to always be ES→EN, case-insensitive */
+    var rawTrans = loadUnitTrans(activeInv);
+    var normalizedTrans = {};
+    var tempUnitsLower = tempUnits.map(function(u) { return u.toLowerCase(); });
+    Object.keys(rawTrans).forEach(function(k) {
+      var v = rawTrans[k];
+      var isKeyES = tempUnitsLower.indexOf(k.toLowerCase()) >= 0;
+      if (isKeyES) {
+        normalizedTrans[k] = v; /* already ES→EN */
+      } else {
+        if (v) { normalizedTrans[v] = k; } /* swap EN→ES to ES→EN */
+      }
+    });
+    tempUnitTrans = normalizedTrans;
     renderUnitMgrList();
     document.getElementById("unitNewNameES").value = "";
     document.getElementById("unitNewNameEN").value = "";
@@ -2108,17 +2184,26 @@
           var newOther = document.getElementById("epUnitOther").value.trim();
           if (!newName) { return; }
           var oldName = tempUnits[idx];
-          tempUnits[idx] = newName;
+
+          /* Always normalize to Spanish as primary key */
+          var newES, newEN;
+          if (lang === "es") {
+            newES = newName;
+            newEN = newOther;
+          } else {
+            newES = newOther || newName;
+            newEN = newName;
+          }
+          if (!newES) { newES = newEN; }
+
+          tempUnits[idx] = newES;
+
           var reverse2 = {};
           Object.keys(tempUnitTrans).forEach(function(es) { reverse2[tempUnitTrans[es]] = es; });
-          if (lang === "es") {
-            delete tempUnitTrans[oldName];
-            if (newOther) { tempUnitTrans[newName] = newOther; }
-          } else {
-            var oldES = reverse2[oldName] || oldName;
-            delete tempUnitTrans[oldES];
-            if (newOther) { tempUnitTrans[newOther] = newName; }
-          }
+          var oldES = (reverse2[oldName] || oldName);
+          delete tempUnitTrans[oldES];
+          if (newEN && newEN !== newES) { tempUnitTrans[newES] = newEN; }
+
           renderUnitMgrList();
         });
       });
@@ -2164,12 +2249,15 @@
     if (!nameES) { nameES = nameEN; }
     if (!nameEN) { nameEN = nameES; }
 
-    var exists = tempUnits.some(function(u) { return u.toLowerCase() === nameActive.toLowerCase(); });
+    /* Always store Spanish as primary key */
+    var primaryKey = nameES;
+
+    var exists = tempUnits.some(function(u) { return u.toLowerCase() === primaryKey.toLowerCase(); });
     if (exists) { toast(tr("toastUnitExists")); return; }
 
-    tempUnits.push(nameActive);
+    tempUnits.push(primaryKey);
     if (nameES !== nameEN) {
-      tempUnitTrans[nameES] = nameEN;
+      tempUnitTrans[nameES] = nameEN; /* always ES → EN */
     }
     document.getElementById("unitNewNameES").value = "";
     document.getElementById("unitNewNameEN").value = "";
@@ -2362,8 +2450,8 @@
       var diffStyle = diff > 0 ? "color:#1a6e3a;font-weight:700;"
         : diff === 0 ? "color:#555;" : "color:#b02020;font-weight:700;";
       rows += "<tr>";
-      rows += "<td><strong>" + escapeHTML(x.nombre) + "</strong></td>";
-      rows += "<td><span class=\"pp-badge\">" + escapeHTML(x.categoria) + "</span></td>";
+      rows += "<td><strong>" + escapeHTML(displayName(x)) + "</strong></td>";
+      rows += "<td><span class=\"pp-badge\">" + escapeHTML(displayCat(x.categoria)) + "</span></td>";
       rows += "<td><strong>" + x.cantidad + "</strong></td>";
       rows += "<td style=\"" + diffStyle + "\">" + diffSign + diff + "</td>";
       rows += "<td>" + escapeHTML(displayUnit(x.unidad)) + "</td>";
