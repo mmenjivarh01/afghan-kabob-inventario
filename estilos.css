@@ -987,7 +987,11 @@ body.guest-mode .guest-banner {
   transition: border-color 0.15s; box-sizing: border-box;
 }
 .mgr-edit-input:focus { border-color: var(--gold); }
-.mgr-edit-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem; flex-wrap: nowrap; }
-.mgr-edit-cancel { flex-shrink: 1; min-width: 0; }
-.mgr-edit-save { padding: 0.5rem 1rem; font-size: 0.85rem; flex-shrink: 0; white-space: nowrap; }
+.mgr-edit-actions { display: flex; gap: 0.5rem; margin-top: 0.25rem; }
+.mgr-edit-actions .mgr-edit-cancel,
+.mgr-edit-actions .mgr-edit-save {
+  flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important;
+  padding: 0.55rem 0.5rem !important; font-size: 0.85rem !important;
+  white-space: nowrap; text-align: center; box-sizing: border-box;
+}
 .mgr-item-selected { border-color: var(--gold) !important; background: rgba(168,130,30,0.05) !important; }
