@@ -152,15 +152,15 @@ header {
 .toolbar { display: flex; flex-direction: column; gap: 0.65rem; margin-bottom: 1.1rem; }
 .toolbar-top { display: flex; gap: 0.65rem; align-items: center; }
 .search-wrap { position: relative; flex: 1; min-width: 0; }
+.search-wrap { position: relative; flex: 1; min-width: 0; }
 .search-wrap input {
   width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text);
-  padding: 0.6rem 0.9rem 0.6rem 2.2rem; border-radius: var(--radius-md);
+  padding: 0.6rem 0.9rem 0.6rem 2.5rem; border-radius: var(--radius-md);
   font-family: 'DM Sans', sans-serif; font-size: 0.9rem; outline: none;
   transition: var(--transition); box-shadow: var(--shadow-xs);
 }
 .search-wrap input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(168,130,30,0.10); }
-.search-icon { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; line-height: 1; display: flex; align-items: center; }
-.search-icon svg { width: 14px; height: 14px; display: block; }
+.search-icon { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); pointer-events: none; font-size: 0.85rem; line-height: 1; z-index: 1; }
 .btn-add {
   background: linear-gradient(135deg, var(--gold), var(--gold-light));
   color: #fff; border: none; padding: 0.6rem 1.1rem; border-radius: var(--radius-md);

@@ -1661,7 +1661,7 @@
     document.getElementById("adjName").textContent = escapeHTML(displayName(p));
     document.getElementById("adjCurrent").textContent = tr("adjCurrent")+" "+escapeHTML(p.cantidad)+" "+escapeHTML(displayUnit(p.unidad));
     document.getElementById("adjQty").value="";
-    document.getElementById("adjPreview").textContent=tr("adjPrompt");
+    document.getElementById("adjPreview").style.display = "none";
     setAdjMode("entrada");
     document.getElementById("adjOverlay").classList.add("open");
     setTimeout(function(){document.getElementById("adjQty").focus();},150);
@@ -1681,7 +1681,8 @@
     var val=document.getElementById("adjQty").value;
     var qty=parseFloat(val);
     var el=document.getElementById("adjPreview");
-    if (!val||isNaN(qty)) { el.textContent=tr("adjPrompt"); return; }
+    if (!val||isNaN(qty)) { el.style.display="none"; return; }
+    el.style.display="";
     var nuevo;
     if (adjMode==="entrada") { nuevo=p.cantidad+qty; }
     else if (adjMode==="salida") { nuevo=p.cantidad-qty; }
@@ -1854,7 +1855,7 @@
       var p         = PAL[i % PAL.length];
       var c         = tempCats[i];
       var icon      = tempCatIcons[c] || "";
-      var otherName = lang === "es" ? (trans[c] || "") : (reverse[c] || "");
+      var otherName = trans[c] || reverse[c] || "";
       var flagOther = lang === "es" ? "🇬🇧" : "🇪🇸";
 
       h += "<div class=\"mgr-item mgr-item-view\" data-rowid=\"" + i + "\">";
@@ -1947,7 +1948,11 @@
           delete tempCatTrans[oldES];
           if (newEN && newEN !== newES) { tempCatTrans[newES] = newEN; }
 
+          /* Close panel and re-render */
+          panel.remove();
+          list.querySelectorAll(".mgr-item-view").forEach(function(r){ r.classList.remove("mgr-item-selected"); });
           renderCatMgrList();
+          toast(lang === "es" ? "Categoría actualizada" : "Category updated");
         });
       });
     });
@@ -1960,25 +1965,93 @@
   }
 
   function eliminarTempCat(idx) {
-    var cat   = tempCats[idx];
-    var inUse = ps().some(function(p) { return p.categoria === cat; });
-    var first = "";
-    for (var i = 0; i < tempCats.length; i++) { if (i !== idx) { first = tempCats[i]; break; } }
-    openGC({
-      icon: "!", title: tr("gcDelCatTitle"),
-      msg1: tr("gcDelMsg1Cat"), name: '"' + escapeHTML(cat) + '"?',
-      msg2: inUse ? tr("gcDelMsg2Use") : tr("gcDelMsg2NoUse"),
-      confirmLabel: tr("delConfirm"), cancelLabel: tr("cancel"),
-      onConfirm: function() {
-        /* Remove from translation map too */
-        var trans   = tempCatTrans;
-        var reverse = {};
-        Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
-        if (trans[cat])   { delete trans[cat]; }
-        if (reverse[cat]) { delete trans[reverse[cat]]; }
-        tempCats.splice(idx, 1);
-        renderCatMgrList();
-      }
+    var cat      = tempCats[idx];
+    var affected = ps().filter(function(p) { return p.categoria === cat; });
+    var count    = affected.length;
+    var otherCats = tempCats.filter(function(c, i) { return i !== idx; });
+
+    if (count === 0) {
+      /* No products — delete directly */
+      openGC({
+        icon: "🗑️", title: tr("gcDelCatTitle"),
+        msg1: tr("gcDelMsg1Cat"), name: '"' + escapeHTML(displayCat(cat)) + '"?',
+        msg2: tr("gcDelMsg2NoUse"),
+        confirmLabel: tr("delConfirm"), cancelLabel: tr("cancel"),
+        onConfirm: function() {
+          var trans   = tempCatTrans;
+          var reverse = {};
+          Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
+          if (trans[cat])   { delete trans[cat]; }
+          if (reverse[cat]) { delete trans[reverse[cat]]; }
+          delete tempCatIcons[cat];
+          tempCats.splice(idx, 1);
+          renderCatMgrList();
+        }
+      });
+      return;
+    }
+
+    /* Products exist — show selector for destination category */
+    if (otherCats.length === 0) {
+      toast(lang === "es"
+        ? "No puedes eliminar la única categoría"
+        : "Cannot delete the only category");
+      return;
+    }
+
+    /* Build a mini-modal inside the manager */
+    var existing = document.querySelector(".cat-del-confirm");
+    if (existing) { existing.remove(); }
+
+    var destDefault = otherCats[0];
+    var panel = document.createElement("div");
+    panel.className = "mgr-edit-panel cat-del-confirm";
+    var titleEl  = lang === "es" ? "⚠️ Eliminar categoría" : "⚠️ Delete category";
+    var msgEl    = lang === "es"
+      ? count + " producto(s) serán reasignados a:"
+      : count + " product(s) will be reassigned to:";
+    var lblCancel = lang === "es" ? "Cancelar" : "Cancel";
+    var lblDel    = lang === "es" ? "🗑️ Eliminar" : "🗑️ Delete";
+
+    var opts = otherCats.map(function(c) {
+      var icon = catIcon(c) || "";
+      return "<option value=\"" + escapeHTML(c) + "\">" + (icon ? icon + " " : "") + escapeHTML(displayCat(c)) + "</option>";
+    }).join("");
+
+    panel.innerHTML =
+      "<div class=\"mgr-edit-panel-title\" style=\"color:var(--red)\">" + titleEl + "</div>" +
+      "<div style=\"font-size:0.85rem;color:var(--text);margin-bottom:0.4rem\">" + msgEl + "</div>" +
+      "<select id=\"catDelDest\" style=\"width:100%;font-size:16px;padding:0.5rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);box-sizing:border-box\">" + opts + "</select>" +
+      "<div class=\"mgr-edit-actions\" style=\"margin-top:0.75rem\">" +
+        "<button class=\"mgr-edit-cancel cat-del-cancel\">" + lblCancel + "</button>" +
+        "<button class=\"mgr-save-btn cat-del-confirm-btn\" style=\"background:var(--red);border-color:var(--red)\">" + lblDel + "</button>" +
+      "</div>";
+
+    /* Insert after the list */
+    var list = document.getElementById("catManagerList");
+    list.parentNode.insertBefore(panel, list.nextSibling);
+
+    panel.querySelector(".cat-del-cancel").addEventListener("click", function() {
+      panel.remove();
+    });
+
+    panel.querySelector(".cat-del-confirm-btn").addEventListener("click", function() {
+      var dest = document.getElementById("catDelDest").value;
+      /* Reassign products */
+      ps().forEach(function(p) {
+        if (p.categoria === cat) { p.categoria = dest; }
+      });
+      /* Remove from trans maps */
+      var trans   = tempCatTrans;
+      var reverse = {};
+      Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
+      if (trans[cat])   { delete trans[cat]; }
+      if (reverse[cat]) { delete trans[reverse[cat]]; }
+      delete tempCatIcons[cat];
+      tempCats.splice(idx, 1);
+      panel.remove();
+      renderCatMgrList();
+      toast((lang === "es" ? count + " productos reasignados a " : count + " products reassigned to ") + displayCat(dest));
     });
   }
 
@@ -2088,21 +2161,8 @@
   }
 
   function openUnitMgr() {
-    tempUnits = us().slice();
-    /* Normalize tempUnitTrans to always be ES→EN, case-insensitive */
-    var rawTrans = loadUnitTrans(activeInv);
-    var normalizedTrans = {};
-    var tempUnitsLower = tempUnits.map(function(u) { return u.toLowerCase(); });
-    Object.keys(rawTrans).forEach(function(k) {
-      var v = rawTrans[k];
-      var isKeyES = tempUnitsLower.indexOf(k.toLowerCase()) >= 0;
-      if (isKeyES) {
-        normalizedTrans[k] = v; /* already ES→EN */
-      } else {
-        if (v) { normalizedTrans[v] = k; } /* swap EN→ES to ES→EN */
-      }
-    });
-    tempUnitTrans = normalizedTrans;
+    tempUnits     = us().slice();
+    tempUnitTrans = Object.assign({}, loadUnitTrans(activeInv));
     renderUnitMgrList();
     document.getElementById("unitNewNameES").value = "";
     document.getElementById("unitNewNameEN").value = "";
@@ -2126,8 +2186,9 @@
 
     var h = "";
     for (var i = 0; i < tempUnits.length; i++) {
-      var u         = tempUnits[i];
-      var otherName = lang === "es" ? (trans[u] || "") : (reverse[u] || "");
+      var u = tempUnits[i];
+      /* Look up translation in both directions */
+      var otherName = trans[u] || reverse[u] || "";
       var flagOther = lang === "es" ? "🇬🇧" : "🇪🇸";
 
       h += "<div class=\"mgr-item mgr-item-view\" data-rowid=\"" + i + "\">";
@@ -2204,7 +2265,10 @@
           delete tempUnitTrans[oldES];
           if (newEN && newEN !== newES) { tempUnitTrans[newES] = newEN; }
 
+          panel.remove();
+          list.querySelectorAll(".mgr-item-view").forEach(function(r){ r.classList.remove("mgr-item-selected"); });
           renderUnitMgrList();
+          toast(lang === "es" ? "Unidad actualizada" : "Unit updated");
         });
       });
     });
@@ -2217,24 +2281,77 @@
   }
 
   function eliminarTempUnit(idx) {
-    var u     = tempUnits[idx];
-    var inUse = ps().some(function(p) { return p.unidad === u; });
-    var first = "";
-    for (var i = 0; i < tempUnits.length; i++) { if (i !== idx) { first = tempUnits[i]; break; } }
-    openGC({
-      icon: "!", title: tr("gcDelUnitTitle"),
-      msg1: tr("gcDelMsg1Unit"), name: '"' + escapeHTML(u) + '"?',
-      msg2: inUse ? tr("gcDelMsg2Use") : tr("gcDelMsg2NoUse"),
-      confirmLabel: tr("delConfirm"), cancelLabel: tr("cancel"),
-      onConfirm: function() {
-        var trans   = tempUnitTrans;
-        var reverse = {};
-        Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
-        if (trans[u])   { delete trans[u]; }
-        if (reverse[u]) { delete trans[reverse[u]]; }
-        tempUnits.splice(idx, 1);
-        renderUnitMgrList();
-      }
+    var u         = tempUnits[idx];
+    var affected  = ps().filter(function(p) { return p.unidad === u; });
+    var count     = affected.length;
+    var otherUnits = tempUnits.filter(function(x, i) { return i !== idx; });
+
+    if (count === 0) {
+      openGC({
+        icon: "🗑️", title: tr("gcDelUnitTitle"),
+        msg1: tr("gcDelMsg1Unit"), name: '"' + escapeHTML(displayUnit(u)) + '"?',
+        msg2: tr("gcDelMsg2NoUse"),
+        confirmLabel: tr("delConfirm"), cancelLabel: tr("cancel"),
+        onConfirm: function() {
+          var trans   = tempUnitTrans;
+          var reverse = {};
+          Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
+          if (trans[u])   { delete trans[u]; }
+          if (reverse[u]) { delete trans[reverse[u]]; }
+          tempUnits.splice(idx, 1);
+          renderUnitMgrList();
+        }
+      });
+      return;
+    }
+
+    if (otherUnits.length === 0) {
+      toast(lang === "es" ? "No puedes eliminar la única unidad" : "Cannot delete the only unit");
+      return;
+    }
+
+    var existing = document.querySelector(".unit-del-confirm");
+    if (existing) { existing.remove(); }
+
+    var panel = document.createElement("div");
+    panel.className = "mgr-edit-panel unit-del-confirm";
+    var titleEl   = lang === "es" ? "⚠️ Eliminar unidad" : "⚠️ Delete unit";
+    var msgEl     = lang === "es"
+      ? count + " producto(s) serán reasignados a:"
+      : count + " product(s) will be reassigned to:";
+    var lblCancel = lang === "es" ? "Cancelar" : "Cancel";
+    var lblDel    = lang === "es" ? "🗑️ Eliminar" : "🗑️ Delete";
+
+    var opts = otherUnits.map(function(x) {
+      return "<option value=\"" + escapeHTML(x) + "\">" + escapeHTML(displayUnit(x)) + "</option>";
+    }).join("");
+
+    panel.innerHTML =
+      "<div class=\"mgr-edit-panel-title\" style=\"color:var(--red)\">" + titleEl + "</div>" +
+      "<div style=\"font-size:0.85rem;color:var(--text);margin-bottom:0.4rem\">" + msgEl + "</div>" +
+      "<select id=\"unitDelDest\" style=\"width:100%;font-size:16px;padding:0.5rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);box-sizing:border-box\">" + opts + "</select>" +
+      "<div class=\"mgr-edit-actions\" style=\"margin-top:0.75rem\">" +
+        "<button class=\"mgr-edit-cancel unit-del-cancel\">" + lblCancel + "</button>" +
+        "<button class=\"mgr-save-btn unit-del-confirm-btn\" style=\"background:var(--red);border-color:var(--red)\">" + lblDel + "</button>" +
+      "</div>";
+
+    var list = document.getElementById("unitManagerList");
+    list.parentNode.insertBefore(panel, list.nextSibling);
+
+    panel.querySelector(".unit-del-cancel").addEventListener("click", function() { panel.remove(); });
+
+    panel.querySelector(".unit-del-confirm-btn").addEventListener("click", function() {
+      var dest = document.getElementById("unitDelDest").value;
+      ps().forEach(function(p) { if (p.unidad === u) { p.unidad = dest; } });
+      var trans   = tempUnitTrans;
+      var reverse = {};
+      Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
+      if (trans[u])   { delete trans[u]; }
+      if (reverse[u]) { delete trans[reverse[u]]; }
+      tempUnits.splice(idx, 1);
+      panel.remove();
+      renderUnitMgrList();
+      toast((lang === "es" ? count + " productos reasignados a " : count + " products reassigned to ") + displayUnit(dest));
     });
   }
 

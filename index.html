@@ -152,7 +152,7 @@
   <div class="toolbar" role="search">
     <div class="toolbar-top">
       <div class="search-wrap">
-        <span class="search-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+        <span class="search-icon" aria-hidden="true">🔍</span>
         <input type="search" id="searchInput" placeholder="Buscar..." aria-label="Buscar producto">
       </div>
       <button type="button" class="btn-add" id="btnAgregar" aria-label="Agregar nuevo producto">
@@ -265,7 +265,7 @@
       <label for="adjQty" id="adjLabel">Cantidad</label>
       <input type="text" inputmode="decimal" id="adjQty" min="0" step="0.1" placeholder="0" aria-labelledby="adjLabel">
     </div>
-    <div class="adj-preview" id="adjPreview" aria-live="polite">Ingresa una cantidad</div>
+    <div class="adj-preview" id="adjPreview" aria-live="polite" style="display:none"></div>
     <div class="modal-actions">
       <button type="button" class="btn-cancel" id="btnAdjCancel">Cancelar</button>
       <button type="button" class="btn-save" id="btnAdjConfirm">Confirmar</button>
