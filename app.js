@@ -1067,27 +1067,119 @@
         if (data.unittrans) { unitTransCache[inv] = data.unittrans; }
         if (data.caticons)  { catIconsCache[inv]  = data.caticons; }
 
-        /* Normalize: if any category/unit is stored in English, convert to Spanish */
-        var ctrans = catTransCache[inv] || {};
-        var utrans = unitTransCache[inv] || {};
-        var ctransReverse = {};
-        Object.keys(ctrans).forEach(function(es) { ctransReverse[ctrans[es].toLowerCase()] = es; });
-        var utransReverse = {};
-        Object.keys(utrans).forEach(function(es) { utransReverse[utrans[es].toLowerCase()] = es; });
+        /* === NORMALIZATION ===
+           Build EN→ES lookup from cattrans/unittrans regardless of direction stored */
+        var rawCT = catTransCache[inv]  || {};
+        var rawUT = unitTransCache[inv] || {};
 
-        /* Normalize categories — if stored in English, swap to Spanish */
-        state[inv].categorias = state[inv].categorias.map(function(c) {
-          return ctransReverse[c.toLowerCase()] || c;
+        /* Build EN→ES maps covering both directions */
+        var cEN2ES = {};
+        var uEN2ES = {};
+
+        /* Current categories and units as reference for what's stored */
+        var storedCats  = state[inv].categorias;
+        var storedUnits = state[inv].unidades;
+
+        Object.keys(rawCT).forEach(function(k) {
+          var v = rawCT[k];
+          if (!v) { return; }
+          /* If k is in stored cats → k is primary, v is translation */
+          /* If v is in stored cats → v is primary, k is translation */
+          var kInCats = storedCats.some(function(c){ return c.toLowerCase() === k.toLowerCase(); });
+          var vInCats = storedCats.some(function(c){ return c.toLowerCase() === v.toLowerCase(); });
+          if (kInCats && !vInCats) {
+            /* k is primary (could be ES or EN), v is the other */
+            /* We can't know which is ES without checking — but if v is already Spanish (in reverse), skip */
+            cEN2ES[v.toLowerCase()] = k; /* treat v as EN, k as ES */
+          } else if (vInCats && !kInCats) {
+            cEN2ES[k.toLowerCase()] = v; /* k is EN, v is ES */
+          } else {
+            /* Both or neither in cats — store both directions */
+            cEN2ES[v.toLowerCase()] = k;
+            cEN2ES[k.toLowerCase()] = v;
+          }
         });
-        /* Normalize units — if stored in English, swap to Spanish */
-        state[inv].unidades = state[inv].unidades.map(function(u) {
-          return utransReverse[u.toLowerCase()] || u;
+
+        Object.keys(rawUT).forEach(function(k) {
+          var v = rawUT[k];
+          if (!v) { return; }
+          var kInUnits = storedUnits.some(function(u){ return u.toLowerCase() === k.toLowerCase(); });
+          var vInUnits = storedUnits.some(function(u){ return u.toLowerCase() === v.toLowerCase(); });
+          if (kInUnits && !vInUnits) {
+            uEN2ES[v.toLowerCase()] = k;
+          } else if (vInUnits && !kInUnits) {
+            uEN2ES[k.toLowerCase()] = v;
+          } else {
+            uEN2ES[v.toLowerCase()] = k;
+            uEN2ES[k.toLowerCase()] = v;
+          }
         });
-        /* Normalize product categories and units */
+
+        /* Normalize categories and units to their canonical stored form */
+        /* We want the version that appears in cattrans/unittrans as a KEY (primary language) */
+        /* Actually: just ensure displayCat/displayUnit can find translations */
+        /* The real fix: rebuild cattrans to always be ES→EN format */
+        var newCT = {};
+        var newUT = {};
+        var catsChanged  = false;
+        var unitsChanged = false;
+
+        /* For categories: find which side is EN by checking cEN2ES */
+        storedCats.forEach(function(c) {
+          var esVer = cEN2ES[c.toLowerCase()];
+          if (esVer && esVer !== c) {
+            /* c is EN, esVer is ES — we should store esVer */
+            catsChanged = true;
+          }
+        });
+
+        state[inv].categorias = storedCats.map(function(c) {
+          var esVer = cEN2ES[c.toLowerCase()];
+          return (esVer && esVer !== c) ? esVer : c;
+        });
+
+        state[inv].unidades = storedUnits.map(function(u) {
+          var esVer = uEN2ES[u.toLowerCase()];
+          if (esVer && esVer !== u) { unitsChanged = true; return esVer; }
+          return u;
+        });
+
         state[inv].productos.forEach(function(p) {
-          if (p.categoria && ctransReverse[p.categoria.toLowerCase()]) { p.categoria = ctransReverse[p.categoria.toLowerCase()]; }
-          if (p.unidad    && utransReverse[p.unidad.toLowerCase()])    { p.unidad    = utransReverse[p.unidad.toLowerCase()]; }
+          if (p.categoria) {
+            var esC = cEN2ES[p.categoria.toLowerCase()];
+            if (esC && esC !== p.categoria) { p.categoria = esC; catsChanged = true; }
+          }
+          if (p.unidad) {
+            var esU = uEN2ES[p.unidad.toLowerCase()];
+            if (esU && esU !== p.unidad) { p.unidad = esU; unitsChanged = true; }
+          }
         });
+
+        /* Rebuild cattrans/unittrans as ES→EN using current normalized state */
+        state[inv].categorias.forEach(function(esC) {
+          /* Find EN translation */
+          Object.keys(rawCT).forEach(function(k) {
+            var v = rawCT[k];
+            if (k.toLowerCase() === esC.toLowerCase() && v) { newCT[esC] = v; }
+            else if (v && v.toLowerCase() === esC.toLowerCase() && k) { newCT[esC] = k; }
+          });
+        });
+        state[inv].unidades.forEach(function(esU) {
+          Object.keys(rawUT).forEach(function(k) {
+            var v = rawUT[k];
+            if (k.toLowerCase() === esU.toLowerCase() && v) { newUT[esU] = v; }
+            else if (v && v.toLowerCase() === esU.toLowerCase() && k) { newUT[esU] = k; }
+          });
+        });
+
+        /* Update caches with normalized ES→EN maps */
+        if (Object.keys(newCT).length)  { catTransCache[inv]  = newCT; }
+        if (Object.keys(newUT).length)  { unitTransCache[inv] = newUT; }
+
+        /* Persist if anything changed */
+        if (catsChanged || unitsChanged) {
+          saveState(inv);
+        }
 
         if (!loaded[inv]) {
           loaded[inv] = true;
@@ -1253,9 +1345,6 @@
   function toggleLang() {
     lang = lang==="es"?"en":"es";
     localStorage.setItem("inv_lang",lang);
-    translateDefaultData();
-    translateUserCats();
-    translateUserUnits();
     applyLang();
   }
   window.toggleLang = toggleLang;
@@ -1661,7 +1750,7 @@
     document.getElementById("adjName").textContent = escapeHTML(displayName(p));
     document.getElementById("adjCurrent").textContent = tr("adjCurrent")+" "+escapeHTML(p.cantidad)+" "+escapeHTML(displayUnit(p.unidad));
     document.getElementById("adjQty").value="";
-    document.getElementById("adjPreview").style.display = "none";
+    document.getElementById("adjPreview").classList.add("hidden-initially");
     setAdjMode("entrada");
     document.getElementById("adjOverlay").classList.add("open");
     setTimeout(function(){document.getElementById("adjQty").focus();},150);
@@ -1681,8 +1770,8 @@
     var val=document.getElementById("adjQty").value;
     var qty=parseFloat(val);
     var el=document.getElementById("adjPreview");
-    if (!val||isNaN(qty)) { el.style.display="none"; return; }
-    el.style.display="";
+    if (!val||isNaN(qty)) { el.classList.add("hidden-initially"); return; }
+    el.classList.remove("hidden-initially");
     var nuevo;
     if (adjMode==="entrada") { nuevo=p.cantidad+qty; }
     else if (adjMode==="salida") { nuevo=p.cantidad-qty; }
@@ -1750,24 +1839,38 @@
     return p.nombre || "";
   }
 
-  function displayUnit(unit) {
-    if (!unit) { return ""; }
-    var trans   = loadUnitTrans(activeInv);
-    var reverse = {};
-    Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
-    if (lang === "en" && trans[unit])   { return trans[unit]; }
-    if (lang === "es" && reverse[unit]) { return reverse[unit]; }
-    return unit;
+  /* Find the translation pair for a word, regardless of map direction.
+     Returns {es, en} or null if not found. */
+  function findPair(word, transMap) {
+    if (!word || !transMap) { return null; }
+    var wLow = word.toLowerCase();
+    var keys = Object.keys(transMap);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i]; var v = transMap[k];
+      if (!v) { continue; }
+      if (k.toLowerCase() === wLow) { return { a: k, b: v }; }
+      if (v.toLowerCase()  === wLow) { return { a: v, b: k }; }
+    }
+    return null;
   }
 
   function displayCat(cat) {
     if (!cat) { return ""; }
-    var trans   = loadCatTrans(activeInv);
-    var reverse = {};
-    Object.keys(trans).forEach(function(es) { reverse[trans[es]] = es; });
-    if (lang === "en" && trans[cat])   { return trans[cat]; }
-    if (lang === "es" && reverse[cat]) { return reverse[cat]; }
-    return cat;
+    if (lang === "es") { return cat; } /* State is always in Spanish */
+    var trans = loadCatTrans(activeInv);
+    var pair  = findPair(cat, trans);
+    if (!pair) { return cat; }
+    /* Return whichever side is NOT the stored value */
+    return pair.a.toLowerCase() === cat.toLowerCase() ? pair.b : pair.a;
+  }
+
+  function displayUnit(unit) {
+    if (!unit) { return ""; }
+    if (lang === "es") { return unit; } /* State is always in Spanish */
+    var trans = loadUnitTrans(activeInv);
+    var pair  = findPair(unit, trans);
+    if (!pair) { return unit; }
+    return pair.a.toLowerCase() === unit.toLowerCase() ? pair.b : pair.a;
   }
   function catIcon(cat) {
     var icons = loadCatIcons(activeInv);
