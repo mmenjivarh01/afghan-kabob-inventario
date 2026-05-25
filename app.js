@@ -2775,21 +2775,34 @@
 
   /* ===== CONTEXT MENU ===== */
   function openCtxMenu(btn) {
-    var menu = document.getElementById("ctx-" + btn.dataset.id);
+    /* Close all other menus */
     document.querySelectorAll(".ctx-menu.open").forEach(function(m) {
-      if (m !== menu) { m.classList.remove("open"); }
+      m.classList.remove("open");
     });
+    var menu = document.getElementById("ctx-" + btn.dataset.id);
     if (!menu) { return; }
-    var wasOpen = menu.classList.contains("open");
-    menu.classList.toggle("open");
-    if (!wasOpen) {
-      var rect       = btn.getBoundingClientRect();
-      var menuH      = menu.offsetHeight || 140;
-      var spaceBelow = window.innerHeight - rect.bottom - 8;
-      var spaceAbove = rect.top - 8;
-      if (spaceBelow < menuH && spaceAbove > spaceBelow) { menu.classList.add("ctx-menu-up"); }
-      else { menu.classList.remove("ctx-menu-up"); }
+
+    /* Position using fixed coords so it always stays in viewport */
+    var rect     = btn.getBoundingClientRect();
+    var menuW    = 170;
+    var menuH    = 140;
+    var left     = rect.right - menuW;
+    var top      = rect.bottom + 4;
+
+    /* Flip up if not enough space below */
+    if (top + menuH > window.innerHeight - 8) {
+      top = rect.top - menuH - 4;
     }
+    /* Clamp left so it never goes off screen */
+    if (left < 8) { left = 8; }
+    if (left + menuW > window.innerWidth - 8) { left = window.innerWidth - menuW - 8; }
+
+    menu.style.position = "fixed";
+    menu.style.top      = top + "px";
+    menu.style.left     = left + "px";
+    menu.style.right    = "auto";
+    menu.style.bottom   = "auto";
+    menu.classList.add("open");
   }
 
   /* iOS: touchend on document for ctx buttons not caught by direct listeners */
