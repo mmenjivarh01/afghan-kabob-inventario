@@ -1502,9 +1502,9 @@
     var nowMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     var updMid = new Date(upd.getFullYear(), upd.getMonth(), upd.getDate()).getTime();
     var days   = Math.round((nowMid - updMid) / 86400000);
-    if (days === 1){ return "background:rgba(60,120,220,0.09)"; }
-    if (days === 2){ return "background:rgba(140,90,40,0.09)";  }
-    if (days === 3){ return "background:rgba(220,190,40,0.10)"; }
+    if (days === 1){ return "background:rgba(60,120,220,0.09)"; }  /* blue   — 1 day  */
+    if (days === 2){ return "background:rgba(230,120,30,0.10)";  }  /* orange — 2 days */
+    if (days === 3){ return "background:rgba(220,190,40,0.10)"; }  /* yellow — 3 days */
     return "background:rgba(150,150,150,0.08)";
   }
 
