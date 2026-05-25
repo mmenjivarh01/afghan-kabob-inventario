@@ -2775,34 +2775,40 @@
 
   /* ===== CONTEXT MENU ===== */
   function openCtxMenu(btn) {
-    /* Close all other menus */
     document.querySelectorAll(".ctx-menu.open").forEach(function(m) {
       m.classList.remove("open");
     });
     var menu = document.getElementById("ctx-" + btn.dataset.id);
     if (!menu) { return; }
 
-    /* Position using fixed coords so it always stays in viewport */
-    var rect     = btn.getBoundingClientRect();
-    var menuW    = 170;
-    var menuH    = 140;
-    var left     = rect.right - menuW;
-    var top      = rect.bottom + 4;
-
-    /* Flip up if not enough space below */
-    if (top + menuH > window.innerHeight - 8) {
-      top = rect.top - menuH - 4;
-    }
-    /* Clamp left so it never goes off screen */
-    if (left < 8) { left = 8; }
-    if (left + menuW > window.innerWidth - 8) { left = window.innerWidth - menuW - 8; }
-
-    menu.style.position = "fixed";
-    menu.style.top      = top + "px";
-    menu.style.left     = left + "px";
-    menu.style.right    = "auto";
-    menu.style.bottom   = "auto";
+    /* Show menu first to measure it */
+    menu.style.visibility = "hidden";
+    menu.style.position   = "fixed";
+    menu.style.top        = "0px";
+    menu.style.left       = "0px";
+    menu.style.right      = "auto";
+    menu.style.bottom     = "auto";
     menu.classList.add("open");
+
+    var menuW  = menu.offsetWidth  || 170;
+    var menuH  = menu.offsetHeight || 140;
+    var rect   = btn.getBoundingClientRect();
+    var vw     = window.innerWidth;
+    var vh     = window.innerHeight;
+
+    /* Horizontal: align right edge of menu to right edge of button, clamp to viewport */
+    var left = rect.right - menuW;
+    if (left < 8)          { left = 8; }
+    if (left + menuW > vw - 8) { left = vw - menuW - 8; }
+
+    /* Vertical: below button if space, else above */
+    var top = rect.bottom + 4;
+    if (top + menuH > vh - 8) { top = rect.top - menuH - 4; }
+    if (top < 8) { top = 8; }
+
+    menu.style.left       = left + "px";
+    menu.style.top        = top  + "px";
+    menu.style.visibility = "";
   }
 
   /* iOS: touchend on document for ctx buttons not caught by direct listeners */
