@@ -1682,6 +1682,8 @@
     sortableCards = Sortable.create(cl, {
       animation:   150,
       handle:      ".drag-handle-card",
+      filter:      ".ctx-btn, .ctx-item, .ctx-menu, .card-btn-adj",
+      preventOnFilter: false,
       ghostClass:  "drag-ghost",
       chosenClass: "drag-chosen",
       onEnd: function(evt) {
