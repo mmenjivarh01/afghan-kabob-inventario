@@ -171,12 +171,31 @@
           &#9881; <span id="hBtnUnit">Unidades</span>
         </button>
       </div>
+      <!-- Leyenda de frescura -->
+      <div class="freshness-legend" id="freshnessLegend">
+        <span class="fl-dot fl-dot-today"></span><span class="fl-lbl" id="flToday">Hoy</span>
+        <span class="fl-dot fl-dot-1"></span><span class="fl-lbl" id="fl1">1d</span>
+        <span class="fl-dot fl-dot-2"></span><span class="fl-lbl" id="fl2">2d</span>
+        <span class="fl-dot fl-dot-3"></span><span class="fl-lbl" id="fl3">3d</span>
+        <span class="fl-dot fl-dot-4"></span><span class="fl-lbl" id="fl4">4d+</span>
+      </div>
     </div>
   </div>
 
   <!-- Tabla de productos (escritorio) -->
   <div class="table-wrap">
     <table aria-label="Lista de productos en inventario">
+      <colgroup>
+        <col><!-- drag -->
+        <col><!-- product -->
+        <col><!-- category -->
+        <col><!-- stock -->
+        <col><!-- minimum -->
+        <col><!-- difference -->
+        <col><!-- unit -->
+        <col><!-- status -->
+        <col><!-- actions -->
+      </colgroup>
       <thead>
         <tr>
           <th scope="col" aria-label="Reordenar"></th>

@@ -1329,7 +1329,9 @@
     var gbEl = document.getElementById("guestBanner");
     if (gbEl) { gbEl.textContent = tr("guestBanner"); }
 
-    /* Translate historial panel */
+    /* Translate freshness legend */
+    var flToday = document.getElementById("flToday");
+    if (flToday) { flToday.textContent = lang === "es" ? "Hoy" : "Today"; }
     var histTitle = document.getElementById("historialTitle");
     if (histTitle) { histTitle.textContent = tr("histTitle"); }
     var histSubtitle = document.querySelector(".historial-subtitle");
@@ -1487,7 +1489,30 @@
     document.getElementById("fUnidad").innerHTML=h;
   }
 
-  /* ===== RENDER ===== */
+  /* Freshness color based on updatedAt timestamp */
+  function freshnessStyle(p) {
+    if (!p.updatedAt) { return "background:rgba(150,150,150,0.08)"; }
+    /* Use local date strings to avoid timezone issues */
+    var now    = new Date();
+    var upd    = new Date(p.updatedAt);
+    var nowStr = now.getFullYear()+"-"+(now.getMonth()+1)+"-"+now.getDate();
+    var updStr = upd.getFullYear()+"-"+(upd.getMonth()+1)+"-"+upd.getDate();
+    if (nowStr === updStr) { return "background:rgba(40,180,80,0.10)"; }
+    /* Days elapsed using local midnight boundaries */
+    var nowMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    var updMid = new Date(upd.getFullYear(), upd.getMonth(), upd.getDate()).getTime();
+    var days   = Math.round((nowMid - updMid) / 86400000);
+    if (days === 1){ return "background:rgba(60,120,220,0.09)"; }
+    if (days === 2){ return "background:rgba(140,90,40,0.09)";  }
+    if (days === 3){ return "background:rgba(220,190,40,0.10)"; }
+    return "background:rgba(150,150,150,0.08)";
+  }
+
+  function freshnessNameStyle(p) {
+    if (!p.updatedAt) { return "color:#6b1a2a;font-weight:700"; }
+    var days = Math.floor((Date.now() - p.updatedAt) / 86400000);
+    return days >= 30 ? "color:#6b1a2a;font-weight:700" : "";
+  }
   function getList() {
     var q = document.getElementById("searchInput").value.toLowerCase();
     var list = ps().filter(function(p) {
@@ -1525,9 +1550,9 @@
       var diff      = p.cantidad - p.minimo;
       var diffSign  = diff > 0 ? "+" : "";
       var diffClass = diff > 0 ? "ok-color" : diff === 0 ? "" : "danger-color";
-      h+="<tr class=\"draggable-row\">";
+      h+="<tr class=\"draggable-row\" style=\""+freshnessStyle(p)+"\">";
       h+="<td class=\"drag-handle\" title=\""+(lang==="es"?"Arrastrar para reordenar":"Drag to reorder")+"\">&#8597;</td>";
-      h+="<td><strong>"+escapeHTML(displayName(p))+"</strong></td>";
+      h+="<td><strong style=\""+freshnessNameStyle(p)+"\">"+escapeHTML(displayName(p))+"</strong></td>";
       h+="<td><div class=\"cat-cell\">";
       if (p.subcategoria) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(subcatLabel(p.subcategoria))+"\">"+subcatIcon(p.subcategoria)+"</span>"; }
       var cIcon = catIcon(p.categoria);
@@ -1537,15 +1562,20 @@
       h+="<td><div class=\"stock-cell\">";
       h+="<div class=\"bar-bg\"><div class=\"bar-fill\" style=\"width:"+pct+"%;background:"+barClr(st)+"\"></div></div>";
       h+="<span class=\"stock-num "+st+"-color\">"+escapeHTML(p.cantidad)+"</span>";
-      h+="<button class=\"btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">&#9881; "+(lang==="es"?"Ajustar":"Adjust")+"</button>";
       h+="</div></td>";
       h+="<td class=\"mono-cell\">"+escapeHTML(p.minimo)+"</td>";
       h+="<td class=\"mono-cell diff-cell "+diffClass+"\">"+diffSign+diff+"</td>";
-      h+="<td class=\"mono-cell small-cell\">"+escapeHTML(displayUnit(p.unidad))+"</td>";
-      h+="<td>"+statusEl(st)+"</td>";
-      h+="<td>";
-      h+="<button class=\"action-btn\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
-      h+="<button class=\"action-btn del\" data-id=\""+p.id+"\" data-action=\"del\" aria-label=\"Eliminar\">&#10005;</button></td>";
+      h+="<td class=\"mono-cell small-cell unit-cell\">"+escapeHTML(displayUnit(p.unidad))+"</td>";
+      h+="<td class=\"status-cell\">"+statusEl(st)+"</td>";
+      h+="<td class=\"ctx-cell\">";
+      h+="<div class=\"ctx-wrap\">";
+      h+="<button class=\"btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">"+(lang==="es"?"⊙ Ajustar":"⊙ Adjust")+"</button>";
+      h+="<button class=\"ctx-btn\" data-id=\""+p.id+"\" data-action=\"ctx\" aria-label=\"Opciones\" aria-haspopup=\"true\">&#8943;</button>";
+      h+="<div class=\"ctx-menu\" id=\"ctx-"+p.id+"\">";
+      h+="<button class=\"ctx-item\" data-id=\""+p.id+"\" data-action=\"edit\">✏️ "+(lang==="es"?"Editar":"Edit")+"</button>";
+      h+="<button class=\"ctx-item\" data-id=\""+p.id+"\" data-action=\"info\">ℹ️ "+(lang==="es"?"Información":"Info")+"</button>";
+      h+="<button class=\"ctx-item ctx-item-del\" data-id=\""+p.id+"\" data-action=\"del\">🗑️ "+(lang==="es"?"Eliminar":"Delete")+"</button>";
+      h+="</div></div></td>";
       h+="</tr>";
     });
     body.innerHTML=h;
@@ -1564,10 +1594,10 @@
       var diff = p.cantidad - p.minimo;
       var diffSign  = diff > 0 ? "+" : "";
       var diffClass = diff > 0 ? "ok-color" : diff === 0 ? "" : "danger-color";
-      h+="<div class=\"inv-card\">";
+      h+="<div class=\"inv-card\" style=\""+freshnessStyle(p)+"\">";
       h+="<div class=\"card-header\">";
       h+="<div>";
-      h+="<div class=\"card-name\">"+escapeHTML(displayName(p))+"</div>";
+      h+="<div class=\"card-name\" style=\""+freshnessNameStyle(p)+"\">"+escapeHTML(displayName(p))+"</div>";
       h+="<div class=\"cat-cell\" style=\"margin-top:0.3rem\">";
       if (p.subcategoria) { h+="<span class=\"subcat-icon\" title=\""+escapeHTML(subcatLabel(p.subcategoria))+"\">"+subcatIcon(p.subcategoria)+"</span>"; }
       var cIcon = catIcon(p.categoria);
@@ -1585,9 +1615,14 @@
       h+="<div class=\"card-field\"><span class=\"card-field-label\">"+lblDiff+"</span><span class=\"card-field-value "+diffClass+"\">"+diffSign+diff+" "+displayUnit(p.unidad)+"</span></div>";
       h+="</div>";
       h+="<div class=\"card-actions\">";
-            h+="<button class=\"card-btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">&#9881; "+(lang==="es"?"Ajustar":"Adjust")+"</button>";
-      h+="<button class=\"card-btn-icon\" data-id=\""+p.id+"\" data-action=\"edit\" aria-label=\"Editar\">&#9998;</button>";
-      h+="<button class=\"card-btn-icon del\" data-id=\""+p.id+"\" data-action=\"del\" aria-label=\"Eliminar\">&#10005;</button>";
+      h+="<button class=\"card-btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">"+(lang==="es"?"⊙ Ajustar":"⊙ Adjust")+"</button>";
+      h+="<div class=\"ctx-wrap\">";
+      h+="<button class=\"ctx-btn\" data-id=\""+p.id+"\" data-action=\"ctx\" aria-label=\"Opciones\">&#8943;</button>";
+      h+="<div class=\"ctx-menu ctx-menu-up\" id=\"ctx-"+p.id+"\">";
+      h+="<button class=\"ctx-item\" data-id=\""+p.id+"\" data-action=\"edit\">✏️ "+(lang==="es"?"Editar":"Edit")+"</button>";
+      h+="<button class=\"ctx-item\" data-id=\""+p.id+"\" data-action=\"info\">ℹ️ "+(lang==="es"?"Información":"Info")+"</button>";
+      h+="<button class=\"ctx-item ctx-item-del\" data-id=\""+p.id+"\" data-action=\"del\">🗑️ "+(lang==="es"?"Eliminar":"Delete")+"</button>";
+      h+="</div></div>";
       h+="</div></div>";
     });
     cl.innerHTML=h;
@@ -1699,7 +1734,8 @@
         nombreES:nombreES, nombreEN:nombreEN,
         subcategoria:subcategoria,
         categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        updatedBy: currentUser ? currentUser.username : "Sistema"
       };
       logAudit("✏️ Editado", nombre +
         (anterior.cantidad !== cantidad ? " | Stock: " + anterior.cantidad + " → " + cantidad + " " + unidad : "") +
@@ -1713,7 +1749,8 @@
         nombreES:nombreES, nombreEN:nombreEN,
         subcategoria:subcategoria,
         categoria:categoria, unidad:unidad, cantidad:cantidad, minimo:minimo,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        updatedBy: currentUser ? currentUser.username : "Sistema"
       });
       logAudit("➕ Agregado", nombre + " | " + subcatLabel(subcategoria) + " / " + categoria + " | Stock inicial: " + cantidad + " " + unidad);
       toast(tr("toastAdded"));
@@ -1792,7 +1829,8 @@
     else { nuevo=qty; }
     if (nuevo<0) { toast(tr("toastNegStock")); return; }
     p.cantidad=Math.round(nuevo*100)/100;
-    p.updatedAt = Date.now(); /* track last update time for sorting */
+    p.updatedAt = Date.now();
+    p.updatedBy = currentUser ? currentUser.username : "Sistema";
     var tipoAdj = adjMode==="entrada" ? "📦 Entrada" : adjMode==="salida" ? "📤 Salida" : "🔧 Ajuste directo";
     logAudit(tipoAdj, displayName(p) + " | " + anterior + " → " + p.cantidad + " " + p.unidad);
     save(); render(); closeAdj();
@@ -2721,10 +2759,62 @@
 
   /* ===== EVENT DELEGATION for dynamic table/card buttons ===== */
   document.addEventListener("click", function(e) {
+    /* Close context menus on outside click */
+    if (!e.target.closest(".ctx-wrap")) {
+      document.querySelectorAll(".ctx-menu.open").forEach(function(m){ m.classList.remove("open"); });
+    }
+
     var btn = e.target.closest("button[data-action]");
     if (!btn) { return; }
     var id     = parseInt(btn.dataset.id, 10);
     var action = btn.dataset.action;
+
+    /* Context menu toggle */
+    if (action === "ctx") {
+      e.stopPropagation();
+      var menu = document.getElementById("ctx-" + btn.dataset.id);
+      document.querySelectorAll(".ctx-menu.open").forEach(function(m) {
+        if (m !== menu) { m.classList.remove("open"); }
+      });
+      if (menu) {
+        menu.classList.toggle("open");
+        if (menu.classList.contains("open")) {
+          /* Detect if menu overflows viewport bottom — if so open upward */
+          var rect = btn.getBoundingClientRect();
+          var spaceBelow = window.innerHeight - rect.bottom;
+          var menuH = 120; /* approximate menu height */
+          if (spaceBelow < menuH) {
+            menu.classList.add("ctx-menu-up");
+          } else {
+            menu.classList.remove("ctx-menu-up");
+          }
+        }
+      }
+      return;
+    }
+
+    /* Info panel */
+    if (action === "info") {
+      document.querySelectorAll(".ctx-menu.open").forEach(function(m){ m.classList.remove("open"); });
+      var p2 = ps().find(function(x){ return x.id === id; });
+      if (!p2) { return; }
+      var loc  = lang==="es"?"es-MX":"en-US";
+      var when = p2.updatedAt
+        ? new Date(p2.updatedAt).toLocaleString(loc,{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})
+        : (lang==="es"?"Sin registro":"No record");
+      var who  = p2.updatedBy || (lang==="es"?"Sistema":"System");
+      openGC({
+        icon:"ℹ️",
+        title: lang==="es"?"Última actualización":"Last update",
+        msg1: displayName(p2),
+        name: "🕐 "+when,
+        msg2: "👤 "+(lang==="es"?"Usuario":"User")+": "+who,
+        confirmLabel: lang==="es"?"Cerrar":"Close",
+        onConfirm: function() {}
+      });
+      return;
+    }
+
     if (action === "edit") { editarProducto(id); }
     if (action === "adj")  { openAdj(id); }
     if (action === "del")  { abrirDelModal(id); }
