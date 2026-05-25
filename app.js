@@ -2757,7 +2757,27 @@
     toastTimer=setTimeout(function(){el.classList.remove("show");},3000);
   }
 
-  /* ===== EVENT DELEGATION for dynamic table/card buttons ===== */
+  /* iOS fix: touchend for ctx buttons since click can be swallowed by scroll */
+  document.addEventListener("touchend", function(e) {
+    var btn = e.target.closest("button[data-action='ctx']");
+    if (!btn) { return; }
+    e.preventDefault();
+    var menu = document.getElementById("ctx-" + btn.dataset.id);
+    document.querySelectorAll(".ctx-menu.open").forEach(function(m) {
+      if (m !== menu) { m.classList.remove("open"); }
+    });
+    if (menu) {
+      menu.classList.toggle("open");
+      if (menu.classList.contains("open")) {
+        var rect       = btn.getBoundingClientRect();
+        var menuH      = menu.offsetHeight || 140;
+        var spaceBelow = window.innerHeight - rect.bottom - 8;
+        var spaceAbove = rect.top - 8;
+        if (spaceBelow < menuH && spaceAbove > spaceBelow) { menu.classList.add("ctx-menu-up"); }
+        else { menu.classList.remove("ctx-menu-up"); }
+      }
+    }
+  }, { passive: false });
   document.addEventListener("click", function(e) {
     /* Close context menus on outside click */
     if (!e.target.closest(".ctx-wrap")) {
@@ -2779,11 +2799,11 @@
       if (menu) {
         menu.classList.toggle("open");
         if (menu.classList.contains("open")) {
-          /* Detect if menu overflows viewport bottom — if so open upward */
-          var rect = btn.getBoundingClientRect();
-          var spaceBelow = window.innerHeight - rect.bottom;
-          var menuH = 120; /* approximate menu height */
-          if (spaceBelow < menuH) {
+          var rect       = btn.getBoundingClientRect();
+          var menuH      = menu.offsetHeight || 140;
+          var spaceBelow = window.innerHeight - rect.bottom - 8;
+          var spaceAbove = rect.top - 8;
+          if (spaceBelow < menuH && spaceAbove > spaceBelow) {
             menu.classList.add("ctx-menu-up");
           } else {
             menu.classList.remove("ctx-menu-up");
