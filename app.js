@@ -1618,7 +1618,7 @@
       h+="<button class=\"card-btn-adj\" data-id=\""+p.id+"\" data-action=\"adj\" aria-label=\"Ajustar stock\">"+(lang==="es"?"⊙ Ajustar":"⊙ Adjust")+"</button>";
       h+="<div class=\"ctx-wrap\">";
       h+="<button class=\"ctx-btn\" data-id=\""+p.id+"\" data-action=\"ctx\" aria-label=\"Opciones\">&#8943;</button>";
-      h+="<div class=\"ctx-menu ctx-menu-up\" id=\"ctx-"+p.id+"\">";
+      h+="<div class=\"ctx-menu\" id=\"ctx-"+p.id+"\">";
       h+="<button class=\"ctx-item\" data-id=\""+p.id+"\" data-action=\"edit\">✏️ "+(lang==="es"?"Editar":"Edit")+"</button>";
       h+="<button class=\"ctx-item\" data-id=\""+p.id+"\" data-action=\"info\">ℹ️ "+(lang==="es"?"Información":"Info")+"</button>";
       h+="<button class=\"ctx-item ctx-item-del\" data-id=\""+p.id+"\" data-action=\"del\">🗑️ "+(lang==="es"?"Eliminar":"Delete")+"</button>";
