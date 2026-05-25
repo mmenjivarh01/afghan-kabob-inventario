@@ -1627,6 +1627,20 @@
     });
     cl.innerHTML=h;
     initCardDragDrop();
+
+    /* Attach direct listeners to ctx buttons — iOS Safari requires this */
+    cl.querySelectorAll(".ctx-btn").forEach(function(btn) {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        openCtxMenu(btn);
+      });
+      /* Also touchend for iOS */
+      btn.addEventListener("touchend", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openCtxMenu(btn);
+      }, { passive: false });
+    });
   }
 
   function sortBy(f) { sortAsc=(sortField===f)?!sortAsc:true; sortField=f; render(); }
@@ -2757,27 +2771,33 @@
     toastTimer=setTimeout(function(){el.classList.remove("show");},3000);
   }
 
-  /* iOS fix: touchend for ctx buttons since click can be swallowed by scroll */
-  document.addEventListener("touchend", function(e) {
-    var btn = e.target.closest("button[data-action='ctx']");
-    if (!btn) { return; }
-    e.preventDefault();
+  /* ===== CONTEXT MENU ===== */
+  function openCtxMenu(btn) {
     var menu = document.getElementById("ctx-" + btn.dataset.id);
     document.querySelectorAll(".ctx-menu.open").forEach(function(m) {
       if (m !== menu) { m.classList.remove("open"); }
     });
-    if (menu) {
-      menu.classList.toggle("open");
-      if (menu.classList.contains("open")) {
-        var rect       = btn.getBoundingClientRect();
-        var menuH      = menu.offsetHeight || 140;
-        var spaceBelow = window.innerHeight - rect.bottom - 8;
-        var spaceAbove = rect.top - 8;
-        if (spaceBelow < menuH && spaceAbove > spaceBelow) { menu.classList.add("ctx-menu-up"); }
-        else { menu.classList.remove("ctx-menu-up"); }
-      }
+    if (!menu) { return; }
+    var wasOpen = menu.classList.contains("open");
+    menu.classList.toggle("open");
+    if (!wasOpen) {
+      var rect       = btn.getBoundingClientRect();
+      var menuH      = menu.offsetHeight || 140;
+      var spaceBelow = window.innerHeight - rect.bottom - 8;
+      var spaceAbove = rect.top - 8;
+      if (spaceBelow < menuH && spaceAbove > spaceBelow) { menu.classList.add("ctx-menu-up"); }
+      else { menu.classList.remove("ctx-menu-up"); }
     }
+  }
+
+  /* iOS: touchend on document for ctx buttons not caught by direct listeners */
+  document.addEventListener("touchend", function(e) {
+    var btn = e.target.closest("button[data-action='ctx']");
+    if (!btn) { return; }
+    e.preventDefault();
+    openCtxMenu(btn);
   }, { passive: false });
+
   document.addEventListener("click", function(e) {
     /* Close context menus on outside click */
     if (!e.target.closest(".ctx-wrap")) {
@@ -2792,24 +2812,7 @@
     /* Context menu toggle */
     if (action === "ctx") {
       e.stopPropagation();
-      var menu = document.getElementById("ctx-" + btn.dataset.id);
-      document.querySelectorAll(".ctx-menu.open").forEach(function(m) {
-        if (m !== menu) { m.classList.remove("open"); }
-      });
-      if (menu) {
-        menu.classList.toggle("open");
-        if (menu.classList.contains("open")) {
-          var rect       = btn.getBoundingClientRect();
-          var menuH      = menu.offsetHeight || 140;
-          var spaceBelow = window.innerHeight - rect.bottom - 8;
-          var spaceAbove = rect.top - 8;
-          if (spaceBelow < menuH && spaceAbove > spaceBelow) {
-            menu.classList.add("ctx-menu-up");
-          } else {
-            menu.classList.remove("ctx-menu-up");
-          }
-        }
-      }
+      openCtxMenu(btn);
       return;
     }
 
