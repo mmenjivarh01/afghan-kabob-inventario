@@ -765,6 +765,7 @@
         name: u.username,
         msg2: "a " + label + "? Aplica en el próximo login.",
         confirmLabel: "Cambiar",
+        danger: false,
         onConfirm: function() {
           db.ref("usuarios/" + uid + "/role").set(newRole).then(function() {
             toast(u.username + " ahora es " + label);
@@ -1869,6 +1870,18 @@
     document.getElementById("gcMsg2").textContent       = opts.msg2||"";
     document.getElementById("gcBtnConfirm").textContent = opts.confirmLabel||tr("delConfirm");
     document.getElementById("gcBtnCancel").textContent  = opts.cancelLabel||tr("cancel");
+    /* Style confirm button: danger=red, else gold */
+    var cb = document.getElementById("gcBtnConfirm");
+    if (opts.danger === false) {
+      cb.className = "btn-save";
+    } else if (opts.danger === "neutral") {
+      cb.className = "btn-cancel";
+    } else {
+      cb.className = "btn-danger";
+    }
+    /* Hide cancel button if not needed */
+    var cancelBtn = document.getElementById("gcBtnCancel");
+    cancelBtn.style.display = opts.hideCancel ? "none" : "";
     gcCb=opts.onConfirm||null;
     document.getElementById("gcOverlay").classList.add("open");
   }
@@ -2844,7 +2857,9 @@
     var who = p2.updatedBy || (lang==="es"?"Sistema":"System");
     openGC({ icon:"ℹ️", title:lang==="es"?"Última actualización":"Last update",
       msg1:displayName(p2), name:"🕐 "+when, msg2:"👤 "+(lang==="es"?"Usuario":"User")+": "+who,
-      confirmLabel:lang==="es"?"Cerrar":"Close", onConfirm:function(){} });
+      confirmLabel:lang==="es"?"Cerrar":"Close",
+      danger: "neutral", hideCancel: true,
+      onConfirm:function(){} });
   });
   document.getElementById("bsDel").addEventListener("click", function() {
     var id = parseInt(ctxActiveId, 10); closeBottomSheet(); abrirDelModal(id);
@@ -2893,6 +2908,7 @@
         name: "🕐 "+when,
         msg2: "👤 "+(lang==="es"?"Usuario":"User")+": "+who,
         confirmLabel: lang==="es"?"Cerrar":"Close",
+        danger: "neutral", hideCancel: true,
         onConfirm: function() {}
       });
       return;
