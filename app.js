@@ -1694,6 +1694,7 @@
 
   /* ===== PRODUCT MODAL ===== */
   function openModal(p) {
+    document.querySelectorAll(".ctx-menu.open").forEach(function(m){ m.classList.remove("open"); });
     p=p||null;
     document.getElementById("modalTitle").textContent = p?tr("modalEdit"):tr("modalAdd");
     document.getElementById("editId").value      = p ? p.id : "";
@@ -1779,6 +1780,7 @@
 
   /* ===== DELETE MODAL ===== */
   function abrirDelModal(id) {
+    document.querySelectorAll(".ctx-menu.open").forEach(function(m){ m.classList.remove("open"); });
     pendingDel=id;
     var p=ps().find(function(x){return x.id===id;});
     document.getElementById("delProductName").textContent = '"'+escapeHTML(displayName(p))+'"?';
@@ -1798,6 +1800,7 @@
 
   /* ===== ADJUST STOCK ===== */
   function openAdj(id) {
+    document.querySelectorAll(".ctx-menu.open").forEach(function(m){ m.classList.remove("open"); });
     adjId=id; adjMode="entrada";
     var p=ps().find(function(x){return x.id===id;});
     document.getElementById("adjName").textContent = escapeHTML(displayName(p));
@@ -2781,8 +2784,11 @@
     var menu = document.getElementById("ctx-" + btn.dataset.id);
     if (!menu) { return; }
 
-    menu.style.visibility = "hidden";
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+
     menu.style.position   = "fixed";
+    menu.style.visibility = "hidden";
     menu.style.top        = "0px";
     menu.style.left       = "0px";
     menu.style.right      = "auto";
@@ -2791,18 +2797,15 @@
 
     var menuW = menu.offsetWidth  || 170;
     var menuH = menu.offsetHeight || 140;
-    var vw    = window.innerWidth;
-    var vh    = window.innerHeight;
 
     var left, top;
 
-    if (vw < 500) {
-      /* Mobile portrait: center horizontally, position in lower third */
-      left = Math.max(8, (vw - menuW) / 2);
-      top  = vh - menuH - 80;
-      if (top < 8) { top = 8; }
+    if (vw <= 768) {
+      /* Mobile: fixed bottom-right, always visible */
+      left = vw - menuW - 12;
+      top  = vh - menuH - 90; /* above browser chrome */
     } else {
-      /* Tablet/desktop: position relative to button */
+      /* Tablet/desktop: relative to button */
       var rect = btn.getBoundingClientRect();
       left = rect.right - menuW;
       if (left < 8)              { left = 8; }
