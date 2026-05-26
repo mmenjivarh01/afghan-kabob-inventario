@@ -2781,7 +2781,6 @@
     var menu = document.getElementById("ctx-" + btn.dataset.id);
     if (!menu) { return; }
 
-    /* Show menu first to measure it */
     menu.style.visibility = "hidden";
     menu.style.position   = "fixed";
     menu.style.top        = "0px";
@@ -2790,21 +2789,28 @@
     menu.style.bottom     = "auto";
     menu.classList.add("open");
 
-    var menuW  = menu.offsetWidth  || 170;
-    var menuH  = menu.offsetHeight || 140;
-    var rect   = btn.getBoundingClientRect();
-    var vw     = window.innerWidth;
-    var vh     = window.innerHeight;
+    var menuW = menu.offsetWidth  || 170;
+    var menuH = menu.offsetHeight || 140;
+    var vw    = window.innerWidth;
+    var vh    = window.innerHeight;
 
-    /* Horizontal: align right edge of menu to right edge of button, clamp to viewport */
-    var left = rect.right - menuW;
-    if (left < 8)          { left = 8; }
-    if (left + menuW > vw - 8) { left = vw - menuW - 8; }
+    var left, top;
 
-    /* Vertical: below button if space, else above */
-    var top = rect.bottom + 4;
-    if (top + menuH > vh - 8) { top = rect.top - menuH - 4; }
-    if (top < 8) { top = 8; }
+    if (vw < 500) {
+      /* Mobile portrait: center horizontally, position in lower third */
+      left = Math.max(8, (vw - menuW) / 2);
+      top  = vh - menuH - 80;
+      if (top < 8) { top = 8; }
+    } else {
+      /* Tablet/desktop: position relative to button */
+      var rect = btn.getBoundingClientRect();
+      left = rect.right - menuW;
+      if (left < 8)              { left = 8; }
+      if (left + menuW > vw - 8) { left = vw - menuW - 8; }
+      top = rect.bottom + 4;
+      if (top + menuH > vh - 8)  { top = rect.top - menuH - 4; }
+      if (top < 8)               { top = 8; }
+    }
 
     menu.style.left       = left + "px";
     menu.style.top        = top  + "px";
