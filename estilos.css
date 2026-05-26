@@ -254,14 +254,14 @@ header {
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 /* Column widths — 9 columns total including drag handle */
 table colgroup col:nth-child(1) { width: 32px; }  /* drag handle */
-table colgroup col:nth-child(2) { width: 26%; }   /* product */
-table colgroup col:nth-child(3) { width: 10%; }   /* category */
-table colgroup col:nth-child(4) { width: 12%; }   /* stock — no button now */
-table colgroup col:nth-child(5) { width: 8%; }    /* minimum */
+table colgroup col:nth-child(2) { width: 22%; }   /* product */
+table colgroup col:nth-child(3) { width: 9%; }    /* category */
+table colgroup col:nth-child(4) { width: 11%; }   /* stock */
+table colgroup col:nth-child(5) { width: 7%; }    /* minimum */
 table colgroup col:nth-child(6) { width: 9%; }    /* difference */
-table colgroup col:nth-child(7) { width: 9%; }    /* unit */
-table colgroup col:nth-child(8) { width: 10%; }   /* status */
-table colgroup col:nth-child(9) { width: 130px; }  /* adj + ctx buttons */
+table colgroup col:nth-child(7) { width: 8%; }    /* unit */
+table colgroup col:nth-child(8) { width: 9%; }    /* status */
+table colgroup col:nth-child(9) { width: 115px; } /* adj + ctx buttons */
 thead { background: var(--surface2); border-bottom: 2px solid var(--border); }
 th {
   padding: 0.8rem 1rem; text-align: left;
@@ -516,6 +516,12 @@ select option { background: var(--surface); color: var(--text); }
   td:nth-child(7), th:nth-child(7) { white-space: nowrap; min-width: 80px; } /* status */
   td:last-child, th:last-child { white-space: nowrap; min-width: 60px; } /* actions */
   .table-wrap { overflow-x: auto; }
+}
+@media (max-width: 900px) {
+  table colgroup col:nth-child(2) { width: 20%; }
+  table colgroup col:nth-child(9) { width: 105px; }
+  .btn-adj { font-size: 0.62rem; padding: 0.15rem 0.4rem; }
+  .status-cell { font-size: 0.72rem; }
 }
 @media (max-width: 768px) { .header-date { display: none; } .container { padding: 1rem; } td, th { padding: 0.6rem 0.7rem; font-size: 0.8rem; } .bar-bg { width: 44px; } .stats-grid { gap: 0.6rem; } .subcat-tabs { gap: 0.25rem; } .subcat-tab { font-size: 0.67rem; padding: 0.3rem 0.6rem; } }
 @media (max-width: 600px) {
