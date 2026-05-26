@@ -568,6 +568,16 @@
   })();
   </script>
   <!-- Logica de la aplicacion -->
+<!-- BOTTOM SHEET — mobile context menu -->
+<div class="bottom-sheet-backdrop" id="bottomSheetBackdrop"></div>
+<div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true">
+  <div class="bottom-sheet-handle"></div>
+  <div class="bottom-sheet-title" id="bottomSheetTitle"></div>
+  <button type="button" class="bottom-sheet-item" id="bsEdit">✏️ <span id="bsEditLbl">Editar</span></button>
+  <button type="button" class="bottom-sheet-item" id="bsInfo">ℹ️ <span id="bsInfoLbl">Información</span></button>
+  <button type="button" class="bottom-sheet-item danger" id="bsDel">🗑️ <span id="bsDelLbl">Eliminar</span></button>
+</div>
+
   <script src="app.js"></script>
 
 <!-- HISTORIAL PANEL -->

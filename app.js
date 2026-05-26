@@ -1801,6 +1801,7 @@
   /* ===== ADJUST STOCK ===== */
   function openAdj(id) {
     document.querySelectorAll(".ctx-menu.open").forEach(function(m){ m.classList.remove("open"); });
+    closeBottomSheet();
     adjId=id; adjMode="entrada";
     var p=ps().find(function(x){return x.id===id;});
     document.getElementById("adjName").textContent = escapeHTML(displayName(p));
@@ -2776,51 +2777,80 @@
     toastTimer=setTimeout(function(){el.classList.remove("show");},3000);
   }
 
-  /* ===== CONTEXT MENU ===== */
+  /* ===== CONTEXT MENU / BOTTOM SHEET ===== */
+  var ctxActiveId = null;
+
   function openCtxMenu(btn) {
-    document.querySelectorAll(".ctx-menu.open").forEach(function(m) {
-      m.classList.remove("open");
-    });
-    var menu = document.getElementById("ctx-" + btn.dataset.id);
-    if (!menu) { return; }
+    document.querySelectorAll(".ctx-menu.open").forEach(function(m){ m.classList.remove("open"); });
+    ctxActiveId = btn.dataset.id;
 
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
-
-    menu.style.position   = "fixed";
-    menu.style.visibility = "hidden";
-    menu.style.top        = "0px";
-    menu.style.left       = "0px";
-    menu.style.right      = "auto";
-    menu.style.bottom     = "auto";
-    menu.classList.add("open");
-
-    var menuW = menu.offsetWidth  || 170;
-    var menuH = menu.offsetHeight || 140;
-
-    var left, top;
-
-    if (vw <= 768) {
-      /* Mobile: fixed bottom-right, always visible */
-      left = vw - menuW - 12;
-      top  = vh - menuH - 90; /* above browser chrome */
+    if (window.innerWidth <= 768) {
+      /* Mobile: bottom sheet */
+      var p = ps().find(function(x){ return String(x.id) === String(ctxActiveId); });
+      var title = p ? displayName(p) : "";
+      document.getElementById("bottomSheetTitle").textContent = title;
+      document.getElementById("bsEditLbl").textContent = lang === "es" ? "Editar" : "Edit";
+      document.getElementById("bsInfoLbl").textContent = lang === "es" ? "Información" : "Info";
+      document.getElementById("bsDelLbl").textContent  = lang === "es" ? "Eliminar" : "Delete";
+      document.getElementById("bottomSheet").classList.add("open");
+      document.getElementById("bottomSheetBackdrop").classList.add("open");
     } else {
-      /* Tablet/desktop: relative to button */
-      var rect = btn.getBoundingClientRect();
-      left = rect.right - menuW;
+      /* Desktop/tablet: floating menu */
+      var menu = document.getElementById("ctx-" + ctxActiveId);
+      if (!menu) { return; }
+      menu.style.visibility = "hidden";
+      menu.style.position   = "fixed";
+      menu.style.top        = "0px";
+      menu.style.left       = "0px";
+      menu.style.right      = "auto";
+      menu.style.bottom     = "auto";
+      menu.classList.add("open");
+      var menuW = menu.offsetWidth  || 170;
+      var menuH = menu.offsetHeight || 140;
+      var rect  = btn.getBoundingClientRect();
+      var vw    = window.innerWidth;
+      var vh    = window.innerHeight;
+      var left  = rect.right - menuW;
       if (left < 8)              { left = 8; }
       if (left + menuW > vw - 8) { left = vw - menuW - 8; }
-      top = rect.bottom + 4;
+      var top = rect.bottom + 4;
       if (top + menuH > vh - 8)  { top = rect.top - menuH - 4; }
       if (top < 8)               { top = 8; }
+      menu.style.left       = left + "px";
+      menu.style.top        = top  + "px";
+      menu.style.visibility = "";
     }
-
-    menu.style.left       = left + "px";
-    menu.style.top        = top  + "px";
-    menu.style.visibility = "";
   }
 
-  /* iOS: touchend on document for ctx buttons not caught by direct listeners */
+  function closeBottomSheet() {
+    document.getElementById("bottomSheet").classList.remove("open");
+    document.getElementById("bottomSheetBackdrop").classList.remove("open");
+    ctxActiveId = null;
+  }
+
+  /* Bottom sheet buttons */
+  document.getElementById("bottomSheetBackdrop").addEventListener("click", closeBottomSheet);
+  document.getElementById("bsEdit").addEventListener("click", function() {
+    var id = parseInt(ctxActiveId, 10); closeBottomSheet(); editarProducto(id);
+  });
+  document.getElementById("bsInfo").addEventListener("click", function() {
+    var id = parseInt(ctxActiveId, 10); closeBottomSheet();
+    var p2 = ps().find(function(x){ return x.id === id; });
+    if (!p2) { return; }
+    var loc  = lang==="es"?"es-MX":"en-US";
+    var when = p2.updatedAt
+      ? new Date(p2.updatedAt).toLocaleString(loc,{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})
+      : (lang==="es"?"Sin registro":"No record");
+    var who = p2.updatedBy || (lang==="es"?"Sistema":"System");
+    openGC({ icon:"ℹ️", title:lang==="es"?"Última actualización":"Last update",
+      msg1:displayName(p2), name:"🕐 "+when, msg2:"👤 "+(lang==="es"?"Usuario":"User")+": "+who,
+      confirmLabel:lang==="es"?"Cerrar":"Close", onConfirm:function(){} });
+  });
+  document.getElementById("bsDel").addEventListener("click", function() {
+    var id = parseInt(ctxActiveId, 10); closeBottomSheet(); abrirDelModal(id);
+  });
+
+  /* iOS: touchend on document for ctx buttons */
   document.addEventListener("touchend", function(e) {
     var btn = e.target.closest("button[data-action='ctx']");
     if (!btn) { return; }

@@ -333,9 +333,10 @@ tr:hover td { background: var(--gold-subtle); }
 .btn-adj:hover { background: var(--gold); color: #fff; border-color: var(--gold); }
 .card-btn-adj {
   flex: 1; background: var(--gold-subtle); border: 1px solid rgba(168,130,30,0.4); color: var(--gold);
-  padding: 0.52rem; border-radius: var(--radius-sm); cursor: pointer;
-  font-family: 'DM Mono', monospace; font-size: 0.76rem; font-weight: 500;
+  padding: 0.45rem 0.5rem; border-radius: var(--radius-sm); cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 0.72rem; font-weight: 500;
   text-align: center; transition: var(--transition);
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
 }
 .card-btn-adj:hover { background: var(--gold); color: #fff; border-color: var(--gold); }
 .status-ok { font-family: 'DM Mono', monospace; font-size: 0.73rem; color: var(--green); font-weight: 500; }
@@ -1070,3 +1071,39 @@ body.guest-mode .guest-banner {
 .ctx-item:hover { background: var(--surface2); }
 .ctx-item-del { color: var(--red); }
 .ctx-item-del:hover { background: rgba(180,40,40,0.07); }
+
+/* BOTTOM SHEET — mobile context menu */
+.bottom-sheet-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4); z-index: 9998;
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.bottom-sheet-backdrop.open { display: block; }
+.bottom-sheet {
+  display: none; position: fixed; left: 0; right: 0; bottom: 0;
+  background: var(--surface); border-radius: 16px 16px 0 0;
+  padding: 0.5rem 0 1.5rem; z-index: 9999;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.bottom-sheet.open { display: block; transform: translateY(0); }
+.bottom-sheet-handle {
+  width: 36px; height: 4px; background: var(--border);
+  border-radius: 99px; margin: 0.5rem auto 1rem;
+}
+.bottom-sheet-title {
+  font-family: 'DM Mono', monospace; font-size: 0.7rem;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em;
+  padding: 0 1.25rem 0.5rem; border-bottom: 1px solid var(--border); margin-bottom: 0.25rem;
+}
+.bottom-sheet-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  width: 100%; padding: 0.9rem 1.25rem; background: none; border: none;
+  color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 1rem;
+  cursor: pointer; text-align: left; transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  min-height: 54px;
+}
+.bottom-sheet-item:hover, .bottom-sheet-item:active { background: var(--surface2); }
+.bottom-sheet-item.danger { color: var(--red); }
